@@ -31,8 +31,15 @@ React features -> services/tauri.ts -> Tauri commands -> codex/session_storage/p
 - `backup.rs`: export, inspection, and restore boundary. Restore accepts an opaque token from a successful inspection, revalidates the ZIP immediately before preview and copying, allows only explicitly selected manifest sessions, verifies the supported JSONL metadata variant and matching ID, re-snapshots conflicts at execution, emits structured `{ code, message }` failures, and writes under canonical `CODEX_HOME/sessions` through create-new semantics with rollback. Safety backups are independently versioned ZIPs with their own manifest.
 - `restore_history.rs`: a local, read-only audit store at `config/restore-history-v1.json`. It keeps newest-first, capped history DTOs and returns only safe summary fields to React.
 - `config.rs`: small JSON settings file, with safe defaults.
-- `commands.rs`: the allowlisted interface available to the frontend.
+- `commands.rs`: the allowlisted interface available to the frontend. Its async
+  wrappers send filesystem, process and dialog work to Tauri's blocking pool.
+  One gate preserves sequential native operations while keeping the window
+  thread responsive; existing commands and DTOs remain unchanged.
 - `logging.rs`: warning-level output by default; no periodic writer or background worker.
+
+The conversations page creates one date formatter per language. Filtering,
+selection and refresh reuse it instead of constructing one formatter per date
+cell during every table render.
 
 ## Portable mode
 

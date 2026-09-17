@@ -17,16 +17,14 @@ Do not repeatedly scan unrelated repository areas after the affected area is kno
 
 ## Project Profile
 
-Update this section when adopting the template.
-
 ```text
-Project:
-Primary stack:
-Package/build tool:
-Main application entry:
-Important modules:
-CI:
-Deployment:
+Project: Dev Companion (Windows-first local developer-tool utility)
+Primary stack: Tauri 2 / Rust / React 19 / TypeScript
+Package/build tool: pnpm / Vite / Cargo
+Main application entry: src/app/App.tsx; src-tauri/src/lib.rs
+Important modules: commands, session_storage, backup, environment, personal_bundle, sourcetree, xampp
+CI: .github/workflows/ci.yml (frontend, Rust, Windows NSIS)
+Deployment: build-publish.ps1; Windows NSIS installer and portable executable
 ```
 
 ## Implementation Rules
@@ -109,15 +107,13 @@ Skip unnecessary stages.
 
 ## Validation
 
-Replace these placeholders with actual repository commands.
-
 ```text
-Install:
-Lint:
-Type-check:
-Tests:
-Build:
-Format:
+Install: pnpm install --frozen-lockfile
+Lint: pnpm lint
+Type-check: pnpm check
+Tests: pnpm test; cargo test --manifest-path src-tauri/Cargo.toml --lib
+Build: pnpm build; ./build-publish.ps1
+Format: rustfmt --edition 2021 <changed Rust files>; preserve existing frontend style
 ```
 
 Run validation appropriate to the change.

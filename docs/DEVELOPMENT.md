@@ -1,14 +1,12 @@
-# Development notes
+# Dev Companion development notes
 
 ## Current 0.2.0 contract
 
-The Windows scope now includes environment archive v2, create-only file recovery and explicit catalog-cache cleanup. See [USER_GUIDE.md](USER_GUIDE.md) and [STORAGE_AUDIT.md](STORAGE_AUDIT.md) for the current included/excluded paths and limits. Desktop chat/database merging is **unfinished and unverified**. The milestone descriptions below are historical contracts, not the current feature scope.
+The Windows scope includes Codex environment archive v2, create-only file recovery, explicit catalog-cache cleanup, and three concrete personal adapters: Beyond Compare `.bcpkg`, SourceTree `bookmarks.xml`, and selected XAMPP files/configuration. See [USER_GUIDE.md](USER_GUIDE.md) and [STORAGE_AUDIT.md](STORAGE_AUDIT.md) for current included/excluded paths and limits. Desktop chat/database merging is **unfinished and unverified**.
 
 Environment ZIP uses `environment-manifest.json` with version 2, kind, timestamp, platform, CLI version and entries (`path`, `group`, `bytes`, `sha256`, `manual`). Inspection checks the complete ZIP inventory and every SHA-256; automatic restore never writes manual database/index/settings components. Session `manifest.json` v1 remains supported; `delete-manifest.json` v1 now uses the existing inspection/restore UI. Missing destination sessions folders are supported, and failed rollback is reported.
 
 New modules: `environment.rs` (offline Windows snapshot/preview/token/create-only recovery), `cleanup.rs` (strict remote catalog allowlist), `fs_safety.rs` (ancestor/reparse/path checks). Portable settings load/save use the same marker-selected location. UI changes invalidate previews and disable selection during operations. See [VALIDATION.md](VALIDATION.md) for actual checks.
-
-## Historical milestones
 
 ## Prerequisites
 

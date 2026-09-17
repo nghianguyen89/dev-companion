@@ -1,20 +1,18 @@
 # Dev Companion
 
-Dev Companion is a lightweight Windows-first desktop utility for selected local developer-tool workflows, including an OpenAI Codex environment. It is an independent community utility, not an official OpenAI product.
+Dev Companion is a Windows-only local migration assistant for selected developer-tool data: Codex environment files, Beyond Compare settings packages, SourceTree bookmarks, and XAMPP projects/configuration. It is an independent community utility, not an official OpenAI product.
 
 It does not replace Codex Desktop, Beyond Compare, SourceTree, XAMPP, or alter their binaries. Local data changes are explicit: create-only recovery, selected local session deletion with safety archives, and allowlisted cache cleanup.
 
 ## Version 0.2.0
 
-Windows environment archives now cover selected chat files/metadata, settings, skills/plugin resources and pets. SHA-256 verification, offline source locks and no-overwrite restore protect the file workflow. **Desktop chat/database merging remains unfinished and unverified.** Database/index/settings are archived for manual migration; copying files does not establish a usable migrated Desktop environment.
+Codex environment archives cover selected local files with SHA-256 verification, offline source locks, and create-only restore. **Desktop chat/database merging remains unfinished and unverified.** Database/index/settings are manual migration components; copying files does not establish a usable migrated Desktop environment.
 
 Temporary cleanup is on-demand and limited to the verified remote plugin catalog cache. Installed plugin resources are protected. Session v1 and existing delete safety archives remain readable.
 
+Personal bundles are concrete Windows-only workflows: an opaque user-exported Beyond Compare `.bcpkg`, fixture-proven non-secret SourceTree `bookmarks.xml`, and explicitly selected XAMPP `htdocs` projects plus reviewed text configuration. Recovery stages files for manual placement or import and never overwrites existing data.
+
 See [User guide](docs/USER_GUIDE.md), [storage inventory and limitations](docs/STORAGE_AUDIT.md), [build instructions](BUILD.md), and [validation](docs/VALIDATION.md).
-
-## Historical milestone 5
-
-Milestone 5 adds safe restore history and explicit storage compatibility boundaries. A read-only local audit records the time, archive filename, selected session IDs, restored/skipped counts, safety-backup path, outcome, and stable error code for each restore attempt. It never stores session content, archive source paths, inspection tokens, credentials, or native error text. History retains the newest 100 entries. Restore remains limited to explicitly selected sessions from a successfully inspected Companion archive: Rust revalidates archives, limits destinations to `CODEX_HOME/sessions`, rejects unsafe paths and symlink escapes, uses create-new writes, skips conflicts without overwrite, and rolls back files created by a failed restore.
 
 ## Supported platforms
 
@@ -35,15 +33,5 @@ pnpm tauri dev
 ```
 
 See [Development notes](docs/DEVELOPMENT.md), [architecture](docs/ARCHITECTURE.md), and the [backup format](docs/BACKUP_FORMAT.md).
-
-## Roadmap
-
-1. Application shell, diagnostics, configuration, and platform abstraction.
-2. Read-only session discovery behind a versioned storage adapter.
-3. Selected-session, versioned backup archive creation.
-4. Read-only inspection and safe restore with safety backups.
-5. Restore history and storage compatibility fixtures (complete).
-6. Skills and pets metadata management.
-# Milestone 6: Safe local conversation deletion
 
 Companion can delete only supported legacy Codex session files discovered under `CODEX_HOME/sessions`; it never calls a cloud API and never deletes Codex Desktop or cloud chats. The UI requires a metadata-only preview and typing `DELETE`. Rust re-resolves IDs, rejects symlinks/path traversal, writes and validates a create-new versioned ZIP safety archive before removal, and restores with create-new semantics if removal fails. Safety archives are retained in Companion's local quarantine until manually removed.

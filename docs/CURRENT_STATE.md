@@ -5,14 +5,19 @@ Concise repository snapshot. Update at meaningful milestones.
 ## Baseline
 
 ```text
-Branch:
-Baseline commit:
-Release/version:
+Branch: main
+Baseline commit: dc504ad
+Release/version: 0.2.0
 ```
 
 ## Working Features
 
-- TBD
+- Windows-only local migration workflows for Codex environment files, Beyond
+  Compare packages, SourceTree bookmarks and selected XAMPP projects/config.
+- Native commands perform blocking filesystem, process and dialog work away
+  from the window thread while retaining serialized operations.
+- Conversations table reuses its per-language date formatter, keeping filters
+  and Refresh responsive for large local session inventories.
 
 ### Phase 0–1 addition
 
@@ -52,11 +57,12 @@ Release/version:
 
 ## In Progress
 
-- TBD
+- No active feature work.
 
 ## Known Issues
 
-- TBD
+- Desktop chat/database merging remains manual and unverified; archive files do
+  not establish a usable migrated Codex Desktop environment.
 
 - A `.bcpkg` cannot prove whether its native export includes saved passwords or
   FTP/SSH credentials; the user's recorded choice is not verification and every
@@ -65,23 +71,28 @@ Release/version:
 
 ## Technical Debt Worth Remembering
 
-- TBD
+- Native operations use one process-wide gate. Split it only if measured
+  independent operations need concurrent execution.
 
 ## Validation Status
 
 ```text
-Lint: pnpm lint (pass)
-Type-check: pnpm check (pass)
-Tests: pnpm test (16 pass); cargo test --lib (57 pass)
-Build: pnpm build (pass); Windows x64 NSIS bundle and portable executable (pass); MSI not run
+Lint: pnpm lint (pass, 2026-09-09)
+Type-check: pnpm check (pass, 2026-09-09)
+Tests: pnpm test (18 pass); cargo test --lib (60 pass, 2026-09-09)
+Build: pnpm build (pass); Windows x64 NSIS bundle and portable executable (pass, 2026-09-09); MSI not run
 ```
 
 Never mark validation as passing unless it was actually run.
 
 ## Important Recent Decisions
 
-- TBD
+- Product branding is Dev Companion; existing `codex-companion` storage and
+  archive identifiers remain for compatibility.
+- The 2026-09-09 portable smoke test exercised 2,000 synthetic conversations:
+  sort rendered in about 122 ms and Refresh completed with the window responsive.
 
 ## Next Recommended Work
 
-- TBD
+- Run the new NSIS installer on a target machine before release; do not claim
+  Desktop chat migration until its manual workflow is verified.

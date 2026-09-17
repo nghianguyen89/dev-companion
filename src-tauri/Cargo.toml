@@ -1,7 +1,7 @@
 [package]
 name = "dev-companion"
 version = "0.2.0"
-description = "A safe, local all-in-one developer companion"
+description = "Windows-only local migration assistant for Codex, Beyond Compare, SourceTree, and XAMPP file workflows"
 authors = ["Dev Companion contributors"]
 edition = "2021"
 rust-version = "1.77"

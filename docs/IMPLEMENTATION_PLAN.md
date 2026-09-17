@@ -1,5 +1,24 @@
 # Implementation Plan — Personal application migration
 
+## 2026-09-09: repository rename and window responsiveness
+
+- Update current repository descriptions for Dev Companion's implemented Windows
+  workflows; retain legacy data directories and archive identifiers.
+- Startup diagnostics and menu-triggered discovery/history currently execute as
+  synchronous Tauri commands on the window thread. Blocking native file dialogs
+  use the same path, contrary to the dialog plugin's threading requirement.
+- Move command bodies to Tauri's blocking worker pool through async commands.
+  Preserve serialized filesystem operations with one async gate, held inside the
+  worker until completion (including if its caller goes away). Keep command
+  names, arguments, success DTOs and structured backup errors compatible.
+- Verify worker-thread execution, serialization, panic/error propagation and
+  existing archive regressions; rebuild Windows NSIS and portable artifacts.
+- The reported trigger is Conversations filter changes or Refresh. Reuse one
+  date formatter per language to remove repeated expensive construction during
+  table rerenders; verify with a 2,000-session fixture and packaged WebView.
+- Recreate pnpm junctions and affected Tauri build caches after the checkout
+  rename; both retained absolute paths to the former repository directory.
+
 ## Task
 
 Assess and plan a safe expansion from Codex-only backup into a personal,

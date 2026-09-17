@@ -1,4 +1,7 @@
-# Windows build
+# Dev Companion Windows build
+
+This repository builds the Windows-only Dev Companion desktop utility and its
+selected Codex, Beyond Compare, SourceTree, and XAMPP file workflows.
 
 Install Node.js, pnpm, Rust stable, Visual Studio C++ Build Tools and WebView2 (Tauri 2 prerequisites).
 Run `./build-publish.ps1` in PowerShell. Missing frontend packages are installed with pnpm; SDK installation is explicit because it changes the machine.

@@ -129,3 +129,30 @@ the legacy application-data path remain unchanged; personal-bundle-v1 accepts
 both the established `true` and newly recorded `false` credential flag; the UI
 keeps opaque-data, unencrypted-transport and manual-import warnings; and no
 generic provider framework was introduced.
+
+## Repository rename and Conversations responsiveness delta — 2026-09-09
+
+Completed checks: `pnpm lint`, `pnpm check`, `pnpm test` (18 tests), `pnpm build`,
+`cargo test --manifest-path src-tauri/Cargo.toml --lib --offline` (60 tests),
+and `git diff --check` all passed.
+
+The Rust tests include worker-thread execution, serialized blocking operations,
+and recovery after a blocking-worker panic. The Conversations test renders
+2,000 rows in English and Vietnamese and verifies a single date formatter per
+language. A fresh portable-app smoke test with 2,000 synthetic local sessions
+rendered a sort change in about 122 ms; Refresh immediately entered its loading
+state, completed, and left the application window responsive.
+
+`./build-publish.ps1` produced the Windows x64 NSIS installer and portable
+executable:
+
+```text
+release/portable/dev-companion.exe
+D2C494B3F3225F9318EDD085D3CF7220D1046C61E937D0737537E736529429E3
+
+src-tauri/target/release/bundle/nsis/Dev Companion_0.2.0_x64-setup.exe
+3396E6200FB59C35412631BA7490114B38F1DAE1FEF76318708469E1564DEE90
+```
+
+MSI was not run. The portable smoke test is not an installer installation test,
+and no claim is made for Desktop chat/database merging.

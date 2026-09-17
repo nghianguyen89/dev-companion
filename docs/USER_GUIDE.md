@@ -1,6 +1,12 @@
-# Dev Companion 0.2.0 — sử dụng trên Windows
+# Dev Companion 0.2.0 — hướng dẫn Windows
 
 **Chưa hoàn tất migration chat sử dụng được trong Codex Desktop.** Bản này có backup môi trường và phục hồi file không ghi đè. Chưa gộp database/index, chưa kiểm chứng chat xuất hiện và mở lại trên máy đích. Không dùng kết quả “đã phục hồi file” làm bằng chứng migration thành công.
+
+Dev Companion hiện hỗ trợ các workflow Windows cụ thể: archive môi trường Codex,
+bundle `.bcpkg` do Beyond Compare xuất, `bookmarks.xml` không chứa secret của
+SourceTree, và project/config được chọn của XAMPP. Bundle cá nhân luôn được coi
+là dữ liệu nhạy cảm; phục hồi chỉ đưa file vào staging của Companion để bạn tự
+đặt hoặc import.
 
 ## Backup / chuyển máy
 
@@ -9,6 +15,12 @@
 3. **Xem trước**: kiểm tra số file, dung lượng nguồn, danh sách loại trừ và lý do. Settings có dấu hiệu chứa credential bị loại nguyên file, không âm thầm chỉnh sửa.
 4. **Tạo archive**. Chỉ nhận thành công sau khi hoàn tất ZIP và đọc lại kiểm tra SHA-256. Dung lượng ZIP được báo sau khi ghi.
 5. Chuyển ZIP sang máy đích; giữ nguyên bản nguồn. ZIP chứa nội dung chat và tài nguyên cá nhân, không được mã hóa.
+
+## Bundle cá nhân
+
+- **Beyond Compare:** chọn file `.bcpkg` do `Tools > Export Settings` tạo. Companion giữ nguyên package, không chuyển license và không import tự động.
+- **SourceTree:** chỉ đọc schema `bookmarks.xml` đã được kiểm chứng; phải đóng SourceTree. Repository, account, credential và license không được đưa vào bundle.
+- **XAMPP:** chọn project trực tiếp dưới `htdocs` cùng bốn file cấu hình đã duyệt. Phải dừng Apache, MariaDB và process liên quan; binary, thư mục dữ liệu MariaDB, secret và log bị loại. Placement và import MariaDB vẫn thủ công.
 
 ## Phục hồi vào máy đã có dữ liệu
 
