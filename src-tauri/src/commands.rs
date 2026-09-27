@@ -1,7 +1,7 @@
 use crate::{
     backup, codex,
     config::{self, AppConfiguration, ConfigurationError},
-    local_delete, session_storage,
+    file_transfer, local_delete, session_storage,
 };
 use tauri_plugin_dialog::DialogExt;
 
@@ -255,6 +255,42 @@ pub async fn execute_cleanup(
     confirmation: String,
 ) -> Result<crate::cleanup::Outcome, String> {
     run_blocking(move || crate::cleanup::execute(&token, &confirmation)).await?
+}
+#[tauri::command]
+pub async fn get_file_transfer_readiness() -> Result<file_transfer::Readiness, String> {
+    run_blocking(file_transfer::readiness).await
+}
+#[tauri::command]
+pub async fn list_file_transfer_directory(path: String) -> Result<file_transfer::DirectoryListing, String> {
+    run_blocking(move || file_transfer::list_directory(path)).await?
+}
+#[tauri::command]
+pub async fn preview_file_transfer(config: file_transfer::TransferConfig) -> Result<file_transfer::CommandPreview, String> {
+    run_blocking(move || file_transfer::preview(&config)).await?
+}
+#[tauri::command]
+pub async fn pick_file_transfer_folder(app: tauri::AppHandle, title: String) -> Result<Option<String>, String> {
+    Ok(app.dialog().file().set_title(title).blocking_pick_folder().and_then(|folder| folder.into_path().ok()).map(|path| path.display().to_string()))
+}
+#[tauri::command]
+pub async fn start_file_transfer(app: tauri::AppHandle, config: file_transfer::TransferConfig, analyze: bool) -> Result<file_transfer::Started, String> {
+    run_blocking(move || file_transfer::start(app, config, analyze)).await?
+}
+#[tauri::command]
+pub async fn cancel_file_transfer() -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(file_transfer::cancel).await.map_err(|_| "The cancellation did not complete.")?
+}
+#[tauri::command]
+pub async fn get_file_transfer_history() -> Result<Vec<file_transfer::TransferHistoryEntry>, String> {
+    run_blocking(|| { let configuration = config::load().map_err(configuration_error)?; file_transfer::list_history(&configuration) }).await?
+}
+#[tauri::command]
+pub async fn open_file_transfer_log(path: String) -> Result<(), String> {
+    run_blocking(move || { let configuration = config::load().map_err(configuration_error)?; file_transfer::open_log(&configuration, &path) }).await?
+}
+#[tauri::command]
+pub async fn open_file_transfer_logs_folder() -> Result<(), String> {
+    run_blocking(|| { let configuration = config::load().map_err(configuration_error)?; file_transfer::open_logs_folder(&configuration) }).await?
 }
 
 fn configuration_error(error: ConfigurationError) -> String {

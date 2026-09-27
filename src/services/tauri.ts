@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AppConfiguration, ArchiveInspection, BackupPreview, BackupResult, BeyondCompareBundleInspection, BeyondCompareBundlePreview, BeyondCompareReadiness, BeyondCompareRecoveryPreview, CodexPaths, ConversationDiscovery, DeletePreview, DeleteResult, DiagnosticsSnapshot, RestoreHistoryEntry, RestorePreview, RestoreResult, SourceTreeInspection, SourceTreePreview, SourceTreeReadiness, SourceTreeRecoveryPreview, XamppInspection, XamppPreview, XamppReadiness, XamppRecoveryPreview } from "../types/codex";
+import type { AppConfiguration, ArchiveInspection, BackupPreview, BackupResult, BeyondCompareBundleInspection, BeyondCompareBundlePreview, BeyondCompareReadiness, BeyondCompareRecoveryPreview, CodexPaths, ConversationDiscovery, DeletePreview, DeleteResult, DiagnosticsSnapshot, FileTransferCommandPreview, FileTransferConfig, FileTransferDirectoryListing, FileTransferHistoryEntry, FileTransferReadiness, RestoreHistoryEntry, RestorePreview, RestoreResult, SourceTreeInspection, SourceTreePreview, SourceTreeReadiness, SourceTreeRecoveryPreview, XamppInspection, XamppPreview, XamppReadiness, XamppRecoveryPreview } from "../types/codex";
 
 export const getDiagnostics = (): Promise<DiagnosticsSnapshot> => invoke("get_diagnostics");
 export const getPaths = (): Promise<CodexPaths> => invoke("get_codex_paths");
@@ -33,3 +33,13 @@ export const recoverXampp = (token: string, confirmation: string): Promise<{ rec
 export const getConfiguration = (): Promise<AppConfiguration> => invoke("get_configuration");
 export const saveConfiguration = (configuration: AppConfiguration): Promise<void> =>
   invoke("save_configuration", { configuration });
+export const getFileTransferReadiness = (): Promise<FileTransferReadiness> => invoke("get_file_transfer_readiness");
+export const listFileTransferDirectory = (path: string): Promise<FileTransferDirectoryListing> => invoke("list_file_transfer_directory", { path });
+const fileTransferPayload = (config: FileTransferConfig): FileTransferConfig => ({ ...config, includeSubfolders: config.includeSubfolders === true, preserveTimestamps: config.preserveTimestamps === true, skipJunctionPoints: config.skipJunctionPoints === true, restartable: config.restartable === true, copyEmptyDirectories: config.copyEmptyDirectories === true, verifyDestination: config.verifyDestination === true, saveLog: config.saveLog === true, shutdownWhenFinished: config.shutdownWhenFinished === true, selectionEnabled: config.selectionEnabled === true, mirrorConfirmed: config.mirrorConfirmed === true, systemLocationConfirmed: config.systemLocationConfirmed === true, destinationDataConfirmed: config.destinationDataConfirmed === true });
+export const previewFileTransfer = (config: FileTransferConfig): Promise<FileTransferCommandPreview> => invoke("preview_file_transfer", { config: fileTransferPayload(config) });
+export const pickFileTransferFolder = (title: string): Promise<string | null> => invoke("pick_file_transfer_folder", { title });
+export const startFileTransfer = (config: FileTransferConfig, analyze: boolean) => invoke("start_file_transfer", { config: fileTransferPayload(config), analyze });
+export const cancelFileTransfer = (): Promise<void> => invoke("cancel_file_transfer");
+export const getFileTransferHistory = (): Promise<FileTransferHistoryEntry[]> => invoke("get_file_transfer_history");
+export const openFileTransferLog = (path: string): Promise<void> => invoke("open_file_transfer_log", { path });
+export const openFileTransferLogsFolder = (): Promise<void> => invoke("open_file_transfer_logs_folder");

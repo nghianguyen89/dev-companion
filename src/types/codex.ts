@@ -25,7 +25,20 @@ export interface AppConfiguration {
   createSafetyBackups: boolean;
   language: "en" | "vi";
   logLevel: "error" | "warn" | "info" | "debug";
+  fileTransferProfiles: FileTransferProfile[];
 }
+
+export type FileTransferMode = "simpleCopy" | "fastCopy" | "projectMigration" | "mirror";
+export interface FileTransferConfig { source: string; destination: string; mode: FileTransferMode; includeSubfolders: boolean; preserveTimestamps: boolean; skipJunctionPoints: boolean; restartable: boolean; copyEmptyDirectories: boolean; verifyDestination: boolean; saveLog: boolean; shutdownWhenFinished: boolean; threads: 1 | 2 | 4 | 8 | 16 | 32; retries: number; retryWait: number; excludeFolders: string[]; excludeFiles: string[]; selectionEnabled: boolean; selectedEntries: string[]; mirrorConfirmed: boolean; systemLocationConfirmed: boolean; destinationDataConfirmed: boolean; }
+export interface FileTransferDirectoryEntry { name: string; path: string; isDirectory: boolean; isHidden: boolean; isSystem: boolean; }
+export interface FileTransferDirectoryListing { path: string; entries: FileTransferDirectoryEntry[]; }
+export interface FileTransferProfile { id: string; name: string; config: FileTransferConfig; }
+export interface FileTransferReadiness { available: boolean; path: string | null; }
+export interface FileTransferCommandPreview { command: string; arguments: string[]; warnings: string[]; }
+export interface FileTransferOutput { line: string; stream: "stdout" | "stderr"; }
+export interface FileTransferSummary { filesCopied: number | null; filesSkipped: number | null; filesFailed: number | null; bytesCopied: number | null; }
+export interface FileTransferCompletion { state: "completed" | "completed-with-warning" | "failed"; exitCode: number | null; interpretation: { status: "success" | "warning" | "error"; message: string }; summary: FileTransferSummary; durationSeconds: number; logPath: string | null; verification: "Verified" | "Differences found" | "Verification failed" | null; }
+export interface FileTransferHistoryEntry { id: string; startedAt: string; completedAt: string; source: string; destination: string; preset: FileTransferMode; status: string; bytesCopied: number | null; filesCopied: number | null; durationSeconds: number; exitCode: number | null; logPath: string | null; }
 
 export type ConversationDiscoveryStatus = "ready" | "codexHomeMissing" | "sessionDirectoryMissing" | "permissionDenied" | "filesystemUnavailable";
 

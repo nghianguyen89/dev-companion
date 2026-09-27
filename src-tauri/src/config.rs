@@ -10,6 +10,8 @@ pub struct AppConfiguration {
     pub create_safety_backups: bool,
     pub language: Language,
     pub log_level: LogLevel,
+    #[serde(default)]
+    pub file_transfer_profiles: Vec<crate::file_transfer::TransferProfile>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -39,6 +41,7 @@ impl Default for AppConfiguration {
             create_safety_backups: true,
             language: Language::En,
             log_level: LogLevel::Warn,
+            file_transfer_profiles: Vec::new(),
         }
     }
 }

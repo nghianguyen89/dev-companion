@@ -2,6 +2,7 @@ mod backup;
 mod beyond_compare;
 mod fs_safety;
 mod environment;
+mod file_transfer;
 mod cleanup;
 mod codex;
 mod commands;
@@ -51,6 +52,11 @@ pub fn run() {
             commands::get_xampp_readiness, commands::preview_xampp,
             commands::create_xampp_bundle, commands::inspect_xampp_bundle,
             commands::preview_xampp_recovery, commands::recover_xampp
+            ,commands::get_file_transfer_readiness, commands::preview_file_transfer,
+            commands::list_file_transfer_directory,
+            commands::pick_file_transfer_folder, commands::start_file_transfer,
+            commands::cancel_file_transfer, commands::get_file_transfer_history,
+            commands::open_file_transfer_log, commands::open_file_transfer_logs_folder
         ])
         .run(tauri::generate_context!())
         .expect("error while running Dev Companion");
