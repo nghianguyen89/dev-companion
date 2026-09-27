@@ -1,5 +1,41 @@
 # Implementation Plan — Personal application migration
 
+## 2026-09-25: File Transfer
+
+- Add one concrete `file_transfer.rs` adapter: pure command construction,
+  validation, output-summary parsing, Robocopy exit interpretation, portable
+  logs/history, and one managed background process. Do not add a generic
+  process or transfer framework.
+- The React page owns the editable form and profiles in the existing settings
+  file. Narrow Tauri commands own folder selection, Robocopy availability,
+  execution, cancellation, logs, and portable history.
+- Use direct `robocopy.exe` arguments, never a command shell. Mirror and
+  system-location warnings require confirmation in both UI and native code.
+- Browse source/destination with direct-child Explorer lists. Source begins with
+  no selection; the native command builder excludes every unselected sibling,
+  including hidden/system items, before Robocopy starts.
+- Robocopy's output is streamed as events. Completion reports only parser
+  values that are present; otherwise the UI remains indeterminate.
+
+## 2026-09-17: Codex Environment Manager
+
+- Add one concrete Windows-first `codex_environment.rs` adapter rather than a
+  generic service hierarchy. It owns safe environment metadata, Codex CLI
+  probes/actions, launcher generation, current-user PATH inspection/update and
+  managed `AGENTS.md` block replacement.
+- Persist only environment metadata in the existing settings JSON. Never read,
+  copy, serialize or log Codex authentication data. The default `.codex`
+  environment is an implicit externally-managed entry unless management is
+  explicitly enabled.
+- Keep process and registry work behind narrow Tauri commands on the existing
+  blocking gate. Windows-only actions fail clearly on other platforms.
+- Use create/update/delete metadata semantics only: removing an entry never
+  removes its `CODEX_HOME`; a launcher removal is an explicit separate action.
+- Cover validation, launch-script argument forwarding, User PATH deduplication,
+  managed-instruction preservation/backups and metadata CRUD with focused unit
+  tests. Defer PowerShell profile migration: it is optional and needs a
+  separately scoped AST-backed migration contract.
+
 ## 2026-09-09: repository rename and window responsiveness
 
 - Update current repository descriptions for Dev Companion's implemented Windows

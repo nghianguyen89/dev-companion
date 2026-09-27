@@ -11,6 +11,8 @@ pub struct AppConfiguration {
     pub language: Language,
     pub log_level: LogLevel,
     #[serde(default)]
+    pub codex_environments: Vec<crate::codex_environment::Environment>,
+    #[serde(default)]
     pub file_transfer_profiles: Vec<crate::file_transfer::TransferProfile>,
 }
 
@@ -41,6 +43,7 @@ impl Default for AppConfiguration {
             create_safety_backups: true,
             language: Language::En,
             log_level: LogLevel::Warn,
+            codex_environments: Vec::new(),
             file_transfer_profiles: Vec::new(),
         }
     }

@@ -306,7 +306,7 @@ mod tests {
     use super::*;
 
     fn root(name: &str) -> PathBuf { std::env::temp_dir().join(format!("codex-companion-delete-{name}-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos())) }
-    fn config() -> AppConfiguration { AppConfiguration { theme: crate::config::Theme::System, portable_mode: false, create_safety_backups: true, language: crate::config::Language::En, log_level: crate::config::LogLevel::Info, file_transfer_profiles: Vec::new() } }
+    fn config() -> AppConfiguration { AppConfiguration { theme: crate::config::Theme::System, portable_mode: false, create_safety_backups: true, language: crate::config::Language::En, log_level: crate::config::LogLevel::Info, codex_environments: Vec::new(), file_transfer_profiles: Vec::new() } }
     fn session(home: &Path, name: &str, id: &str) -> PathBuf { let path = home.join("sessions/2026/09/04").join(name); fs::create_dir_all(path.parent().unwrap()).unwrap(); fs::write(&path, format!("{{\"type\":\"session_meta\",\"payload\":{{\"session_id\":\"{id}\"}}}}\n{{\"type\":\"event_msg\",\"payload\":{{\"ignored\":true}}}}" )).unwrap(); path }
 
     #[test]

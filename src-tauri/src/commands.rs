@@ -1,5 +1,5 @@
 use crate::{
-    backup, codex,
+    backup, codex, codex_environment,
     config::{self, AppConfiguration, ConfigurationError},
     file_transfer, local_delete, session_storage,
 };
@@ -141,6 +141,78 @@ pub async fn recover_sourcetree(
 #[tauri::command]
 pub async fn get_xampp_readiness() -> Result<crate::xampp::Readiness, String> {
     run_blocking(crate::xampp::readiness).await
+}
+
+#[tauri::command]
+pub async fn get_codex_environment_overview() -> Result<codex_environment::Overview, String> {
+    run_blocking(|| {
+        let configuration = config::load().map_err(configuration_error)?;
+        codex_environment::overview(&configuration)
+    })
+    .await?
+}
+#[tauri::command]
+pub async fn save_codex_environment(
+    input: codex_environment::EnvironmentInput,
+) -> Result<codex_environment::Environment, String> {
+    run_blocking(move || codex_environment::create_or_update(input)).await?
+}
+#[tauri::command]
+pub async fn regenerate_codex_launcher(
+    id: String,
+) -> Result<codex_environment::ActionResult, String> {
+    run_blocking(move || codex_environment::regenerate_launcher(&id)).await?
+}
+#[tauri::command]
+pub async fn remove_codex_launcher(
+    id: String,
+    confirmation: String,
+) -> Result<codex_environment::ActionResult, String> {
+    run_blocking(move || codex_environment::remove_launcher(&id, &confirmation)).await?
+}
+#[tauri::command]
+pub async fn add_codex_launcher_dir_to_user_path() -> Result<codex_environment::ActionResult, String>
+{
+    run_blocking(codex_environment::add_launcher_dir_to_user_path).await?
+}
+#[tauri::command]
+pub async fn get_codex_environment_instructions(
+    id: String,
+) -> Result<codex_environment::Instructions, String> {
+    run_blocking(move || codex_environment::instructions(&id)).await?
+}
+#[tauri::command]
+pub async fn update_codex_environment_instructions(
+    id: String,
+    content: String,
+) -> Result<codex_environment::ActionResult, String> {
+    run_blocking(move || codex_environment::update_instructions(&id, &content)).await?
+}
+#[tauri::command]
+pub async fn delete_codex_environment(
+    id: String,
+    confirmation: String,
+) -> Result<codex_environment::ActionResult, String> {
+    run_blocking(move || codex_environment::delete_environment(&id, &confirmation)).await?
+}
+#[tauri::command]
+pub async fn open_codex_environment_home(
+    id: String,
+) -> Result<codex_environment::ActionResult, String> {
+    run_blocking(move || codex_environment::open_home(&id)).await?
+}
+#[tauri::command]
+pub async fn open_codex_environment_agents(
+    id: String,
+) -> Result<codex_environment::ActionResult, String> {
+    run_blocking(move || codex_environment::open_agents(&id)).await?
+}
+#[tauri::command]
+pub async fn run_codex_environment_action(
+    id: String,
+    action: String,
+) -> Result<codex_environment::ActionResult, String> {
+    run_blocking(move || codex_environment::run_cli(&id, &action)).await?
 }
 #[tauri::command]
 pub async fn preview_xampp(app: tauri::AppHandle) -> Result<Option<crate::xampp::Preview>, String> {

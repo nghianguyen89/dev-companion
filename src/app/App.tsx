@@ -1,4 +1,5 @@
 import { EnvironmentPage } from "../features/backup/EnvironmentPage";
+import { CodexEnvironmentsPage } from "../features/codex-environments/CodexEnvironmentsPage";
 import { FileTransferPage } from "../features/file-transfer/FileTransferPage";
 import { CleanupPage } from "../features/cleanup/CleanupPage";
 import { useCallback, useState } from "react";
@@ -17,9 +18,10 @@ import { getConfiguration, getDiagnostics, saveConfiguration } from "../services
 import type { AppConfiguration } from "../types/codex";
 import { I18nProvider, translate, type TranslationKey } from "../i18n";
 
-type Page = "fileTransfer" | "environment" | "beyondCompare" | "sourceTree" | "xampp" | "cleanup" | "dashboard" | "conversations" | "backup" | "skills" | "pets" | "diagnostics" | "settings";
+type Page = "fileTransfer" | "codexAccounts" | "environment" | "beyondCompare" | "sourceTree" | "xampp" | "cleanup" | "dashboard" | "conversations" | "backup" | "skills" | "pets" | "diagnostics" | "settings";
 const navigation: Array<{ id: Page; label: TranslationKey; group: TranslationKey }> = [
   { id: "fileTransfer", label: "fileTransfer.title", group: "nav.tools" },
+  { id: "codexAccounts", label: "codexAccounts.title", group: "nav.codex" },
   { id: "environment", label: "environment.title", group: "nav.manage" }, { id: "cleanup", label: "cleanup.title", group: "nav.tools" },
   { id: "beyondCompare", label: "beyondCompare.title", group: "nav.manage" },
   { id: "sourceTree", label: "sourceTree.title", group: "nav.manage" },
@@ -50,15 +52,16 @@ export function App() {
       {page === "conversations" && <ConversationsPage />}
       {page === "backup" && <BackupPage />}
       {page === "environment" && <EnvironmentPage />}
+      {page === "codexAccounts" && <CodexEnvironmentsPage />}
       {page === "beyondCompare" && <BeyondComparePage />}
       {page === "sourceTree" && <SourceTreePage />}
       {page === "xampp" && <XamppPage />}
       {page === "cleanup" && <CleanupPage />}
+      {page === "fileTransfer" && configuration.value && <FileTransferPage configuration={configuration.value} onSaveConfiguration={save} />}
       {page === "skills" && <SkillsPage />}
       {page === "pets" && <PetsPage />}
       {page === "diagnostics" && <DiagnosticsPage diagnostics={diagnostics.value} loading={diagnostics.loading} error={diagnostics.error} onRefresh={diagnostics.refresh} />}
       {page === "settings" && <SettingsPage configuration={configuration.value} onSave={save} />}
-      {page === "fileTransfer" && configuration.value && <FileTransferPage configuration={configuration.value} onSaveConfiguration={save} />}
     </section>
   </main></I18nProvider>;
 }

@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AppConfiguration, ArchiveInspection, BackupPreview, BackupResult, BeyondCompareBundleInspection, BeyondCompareBundlePreview, BeyondCompareReadiness, BeyondCompareRecoveryPreview, CodexPaths, ConversationDiscovery, DeletePreview, DeleteResult, DiagnosticsSnapshot, FileTransferCommandPreview, FileTransferConfig, FileTransferDirectoryListing, FileTransferHistoryEntry, FileTransferReadiness, RestoreHistoryEntry, RestorePreview, RestoreResult, SourceTreeInspection, SourceTreePreview, SourceTreeReadiness, SourceTreeRecoveryPreview, XamppInspection, XamppPreview, XamppReadiness, XamppRecoveryPreview } from "../types/codex";
+import type { AppConfiguration, ArchiveInspection, BackupPreview, BackupResult, BeyondCompareBundleInspection, BeyondCompareBundlePreview, BeyondCompareReadiness, BeyondCompareRecoveryPreview, CodexEnvironmentActionResult, CodexEnvironmentInput, CodexEnvironmentInstructions, CodexEnvironmentOverview, CodexPaths, ConversationDiscovery, DeletePreview, DeleteResult, DiagnosticsSnapshot, FileTransferCommandPreview, FileTransferConfig, FileTransferDirectoryListing, FileTransferHistoryEntry, FileTransferReadiness, RestoreHistoryEntry, RestorePreview, RestoreResult, SourceTreeInspection, SourceTreePreview, SourceTreeReadiness, SourceTreeRecoveryPreview, XamppInspection, XamppPreview, XamppReadiness, XamppRecoveryPreview } from "../types/codex";
 
 export const getDiagnostics = (): Promise<DiagnosticsSnapshot> => invoke("get_diagnostics");
 export const getPaths = (): Promise<CodexPaths> => invoke("get_codex_paths");
@@ -33,6 +33,17 @@ export const recoverXampp = (token: string, confirmation: string): Promise<{ rec
 export const getConfiguration = (): Promise<AppConfiguration> => invoke("get_configuration");
 export const saveConfiguration = (configuration: AppConfiguration): Promise<void> =>
   invoke("save_configuration", { configuration });
+export const getCodexEnvironmentOverview = (): Promise<CodexEnvironmentOverview> => invoke("get_codex_environment_overview");
+export const saveCodexEnvironment = (input: CodexEnvironmentInput) => invoke("save_codex_environment", { input });
+export const regenerateCodexLauncher = (id: string): Promise<CodexEnvironmentActionResult> => invoke("regenerate_codex_launcher", { id });
+export const removeCodexLauncher = (id: string, confirmation: string): Promise<CodexEnvironmentActionResult> => invoke("remove_codex_launcher", { id, confirmation });
+export const addCodexLauncherDirToUserPath = (): Promise<CodexEnvironmentActionResult> => invoke("add_codex_launcher_dir_to_user_path");
+export const getCodexEnvironmentInstructions = (id: string): Promise<CodexEnvironmentInstructions> => invoke("get_codex_environment_instructions", { id });
+export const updateCodexEnvironmentInstructions = (id: string, content: string): Promise<CodexEnvironmentActionResult> => invoke("update_codex_environment_instructions", { id, content });
+export const deleteCodexEnvironment = (id: string, confirmation: string): Promise<CodexEnvironmentActionResult> => invoke("delete_codex_environment", { id, confirmation });
+export const openCodexEnvironmentHome = (id: string): Promise<CodexEnvironmentActionResult> => invoke("open_codex_environment_home", { id });
+export const openCodexEnvironmentAgents = (id: string): Promise<CodexEnvironmentActionResult> => invoke("open_codex_environment_agents", { id });
+export const runCodexEnvironmentAction = (id: string, action: "launch" | "login" | "logout"): Promise<CodexEnvironmentActionResult> => invoke("run_codex_environment_action", { id, action });
 export const getFileTransferReadiness = (): Promise<FileTransferReadiness> => invoke("get_file_transfer_readiness");
 export const listFileTransferDirectory = (path: string): Promise<FileTransferDirectoryListing> => invoke("list_file_transfer_directory", { path });
 const fileTransferPayload = (config: FileTransferConfig): FileTransferConfig => ({ ...config, includeSubfolders: config.includeSubfolders === true, preserveTimestamps: config.preserveTimestamps === true, skipJunctionPoints: config.skipJunctionPoints === true, restartable: config.restartable === true, copyEmptyDirectories: config.copyEmptyDirectories === true, verifyDestination: config.verifyDestination === true, saveLog: config.saveLog === true, shutdownWhenFinished: config.shutdownWhenFinished === true, selectionEnabled: config.selectionEnabled === true, mirrorConfirmed: config.mirrorConfirmed === true, systemLocationConfirmed: config.systemLocationConfirmed === true, destinationDataConfirmed: config.destinationDataConfirmed === true });

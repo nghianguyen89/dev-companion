@@ -18,6 +18,16 @@ Release/version: 0.2.0
   from the window thread while retaining serialized operations.
 - Conversations table reuses its per-language date formatter, keeping filters
   and Refresh responsive for large local session inventories.
+- Codex Environment Manager: custom Windows `CODEX_HOME` entries, CLI status,
+  login/logout/launch handoff, safe `.cmd` launchers, User PATH opt-in, and
+  marker-preserving global `AGENTS.md` management. It never persists or reads
+  authentication credentials; removing metadata never deletes `CODEX_HOME`.
+- File Transfer: direct Windows Robocopy Simple/Fast/Project Migration/Mirror
+  workflows with an explicit direct-child source selection (including
+  hidden/system items), preview, explicit mirror/system confirmations, dry-run,
+  streamed output, cancellation, local logs/history, profiles and optional
+  non-destructive destination verification. Progress remains indeterminate
+  unless an English Robocopy summary is safely parsed.
 
 ### Phase 0–1 addition
 

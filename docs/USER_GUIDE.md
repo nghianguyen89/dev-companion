@@ -8,6 +8,33 @@ SourceTree, và project/config được chọn của XAMPP. Bundle cá nhân lu�
 là dữ liệu nhạy cảm; phục hồi chỉ đưa file vào staging của Companion để bạn tự
 đặt hoặc import.
 
+## File Transfer (Robocopy)
+
+Chọn **File Transfer** để chuyển thư mục cục bộ bằng `robocopy.exe` trực tiếp.
+Sau khi Browse nguồn, danh sách Source items hiện các mục trực tiếp, gồm cả
+hidden/system. Mặc định không chọn mục nào: chỉ thư mục/file được tick mới được
+chuyển. Nếu tick một thư mục thì toàn bộ nội dung bên trong thư mục đó được copy
+(trừ các exclusion đã thêm); các mục cùng cấp chưa tick sẽ không được chuyển.
+Xem command preview trước khi chạy; nút Analyze thêm `/L`, nên không copy hay
+xóa dữ liệu. Simple Copy dùng `/E`; Fast Copy thêm `/MT:8`; Project Migration
+thêm các loại trừ build/cache (`node_modules`, `dist`, `build`, `coverage`,
+`.cache`, `.next`, `.nuxt`, `.vite`, `.tmp`, `temp`, `bin`, `obj`) nhưng giữ
+`.git`, `.env` và IDE metadata. Có thể sửa danh sách này.
+
+Mirror dùng `/MIR` và có thể xóa nội dung chỉ có ở đích. Mỗi lần chạy đều phải
+xác nhận; nếu đích đã có dữ liệu cần xác nhận lần hai. Đường dẫn Windows,
+Program Files, ProgramData và root ổ đĩa cũng cần xác nhận rõ ràng. Không có
+Move hoặc Pause: Cancel dừng Robocopy, sau đó Start lại để Robocopy tự bỏ qua
+file hoàn tất theo ngữ nghĩa của nó.
+
+Output được stream trực tiếp. Parser chỉ hiển thị số file/byte khi Robocopy có
+summary phù hợp; các giá trị không chắc chắn là “Estimate unavailable”. Exit
+code 0–1 là success, 2–7 là completed-with-warning, và từ 8 là failure. Khi
+bật Destination verification, Companion chạy một dry-run thứ hai, không dùng
+hash/checksum và không thực hiện thao tác phá hủy. Logs nằm trong config
+portable/app-data hiện có tại `logs/file-transfer`; history giữ tối đa 100 mục;
+profiles được lưu cùng settings cục bộ.
+
 ## Backup / chuyển máy
 
 1. Đóng Codex Desktop và mọi Codex CLI. Companion không tự đóng ứng dụng.

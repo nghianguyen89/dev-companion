@@ -1,6 +1,8 @@
 # Dev Companion
 
-Dev Companion is a Windows-only local migration assistant for selected developer-tool data: Codex environment files, Beyond Compare settings packages, SourceTree bookmarks, and XAMPP projects/configuration. It is an independent community utility, not an official OpenAI product.
+Dev Companion is a Windows-only local developer-tool utility for selected migration data and Codex environment management: Codex environment files, isolated local Codex environments, Beyond Compare settings packages, SourceTree bookmarks, and XAMPP projects/configuration. It is an independent community utility, not an official OpenAI product.
+
+File Transfer is a local Robocopy GUI for explicit folder transfers. It supports Simple Copy, Fast Copy, Project Migration, and confirmation-protected Mirror operations with direct process launch, live output, logs, profiles, and local history.
 
 It does not replace Codex Desktop, Beyond Compare, SourceTree, XAMPP, or alter their binaries. Local data changes are explicit: create-only recovery, selected local session deletion with safety archives, and allowlisted cache cleanup.
 

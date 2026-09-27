@@ -6,7 +6,7 @@ describe("i18n", () => {
   it("defaults to English", () => expect(translate(undefined, "settings.language")).toBe("Language"));
   it("switches to Vietnamese", () => expect(translate("vi", "nav.settings")).toBe("Cài đặt"));
   it("uses the language persisted in AppConfiguration", () => {
-    const configuration: AppConfiguration = { theme: "system", portableMode: false, createSafetyBackups: true, language: "vi", logLevel: "warn", fileTransferProfiles: [] };
+    const configuration: AppConfiguration = { theme: "system", portableMode: false, createSafetyBackups: true, language: "vi", logLevel: "warn", codexEnvironments: [], fileTransferProfiles: [] };
     expect(translate(configuration.language, "settings.language")).toBe("Ngôn ngữ");
   });
   it("falls back to English when the language is unknown", () => expect(translate("xx" as "en", "backup.restore")).toBe("Restore selected sessions"));
