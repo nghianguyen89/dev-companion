@@ -23,11 +23,11 @@ Release/version: 0.2.0
   marker-preserving global `AGENTS.md` management. It never persists or reads
   authentication credentials; removing metadata never deletes `CODEX_HOME`.
 - File Transfer: direct Windows Robocopy Simple/Fast/Project Migration/Mirror
-  workflows with an explicit direct-child source selection (including
-  hidden/system items), preview, explicit mirror/system confirmations, dry-run,
-  streamed output, cancellation, local logs/history, profiles and optional
-  non-destructive destination verification. Progress remains indeterminate
-  unless an English Robocopy summary is safely parsed.
+  workflows with navigable Source/Destination direct-child views, safe source
+  selection, hidden/system icon/color legend, preview, confirmations, dry-run,
+  streamed output, cancellation, logs/history, profiles and optional
+  non-destructive destination verification. Start analyzes first; determinate
+  progress requires both the dry-run byte total and guarded English completed-file output.
 
 ### Phase 0–1 addition
 

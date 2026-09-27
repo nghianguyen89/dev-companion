@@ -88,8 +88,17 @@ pub struct DirectoryEntry {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct DirectoryBreadcrumb {
+    pub label: String,
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DirectoryListing {
     pub path: String,
+    pub parent: Option<String>,
+    pub breadcrumbs: Vec<DirectoryBreadcrumb>,
     pub entries: Vec<DirectoryEntry>,
 }
 
@@ -117,6 +126,14 @@ pub struct OutputEvent {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ProgressEvent {
+    pub bytes_copied: u64,
+    pub total_bytes: u64,
+    pub percent: u8,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Summary {
     pub files_copied: Option<u64>,
     pub files_skipped: Option<u64>,
@@ -134,6 +151,7 @@ pub struct ExitInterpretation {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CompletionEvent {
+    pub phase: String,
     pub state: String,
     pub exit_code: Option<i32>,
     pub interpretation: ExitInterpretation,
@@ -197,6 +215,8 @@ pub fn list_directory(path: String) -> Result<DirectoryListing, String> {
     });
     Ok(DirectoryListing {
         path: display_path(&root),
+        parent: root.parent().map(display_path),
+        breadcrumbs: directory_breadcrumbs(&root),
         entries,
     })
 }
@@ -210,7 +230,12 @@ pub fn preview(config: &TransferConfig) -> Result<CommandPreview, String> {
     })
 }
 
-pub fn start(app: AppHandle, config: TransferConfig, analyze: bool) -> Result<Started, String> {
+pub fn start(
+    app: AppHandle,
+    config: TransferConfig,
+    analyze: bool,
+    progress_total_bytes: Option<u64>,
+) -> Result<Started, String> {
     validate(&config)?;
     let robocopy = robocopy_path().ok_or("Robocopy is not available on this system.")?;
     let arguments = command_arguments(&config, analyze)?;
@@ -242,6 +267,7 @@ pub fn start(app: AppHandle, config: TransferConfig, analyze: bool) -> Result<St
             child,
             stdout,
             stderr,
+            progress_total_bytes,
         )
     });
     Ok(Started {
@@ -307,14 +333,20 @@ fn run_transfer(
     mut child: std::process::Child,
     stdout: Option<std::process::ChildStdout>,
     stderr: Option<std::process::ChildStderr>,
+    progress_total_bytes: Option<u64>,
 ) {
     let started = OffsetDateTime::now_utc();
     let timer = Instant::now();
     let output = std::sync::Arc::new(Mutex::new(String::new()));
-    let stdout_thread =
-        stdout.map(|stream| stream_output(app.clone(), stream, "stdout", output.clone()));
+    let progress = (!analyze)
+        .then(|| progress_total_bytes.filter(|value| *value > 0))
+        .flatten()
+        .map(ProgressTracker::new);
+    let stdout_thread = stdout.map(|stream| {
+        stream_output(app.clone(), stream, "stdout", output.clone(), progress.clone())
+    });
     let stderr_thread =
-        stderr.map(|stream| stream_output(app.clone(), stream, "stderr", output.clone()));
+        stderr.map(|stream| stream_output(app.clone(), stream, "stderr", output.clone(), None));
     let status = child.wait();
     if let Some(thread) = stdout_thread {
         let _ = thread.join();
@@ -382,6 +414,7 @@ fn run_transfer(
     let _ = app.emit(
         "file-transfer-completed",
         CompletionEvent {
+            phase: if analyze { "analysis" } else { "transfer" }.into(),
             state,
             exit_code,
             interpretation,
@@ -403,9 +436,11 @@ fn stream_output<R: std::io::Read + Send + 'static>(
     stream: R,
     name: &'static str,
     output: std::sync::Arc<Mutex<String>>,
+    progress: Option<ProgressTracker>,
 ) -> thread::JoinHandle<()> {
     thread::spawn(move || {
         for line in BufReader::new(stream).lines().map_while(Result::ok) {
+            let copied_bytes = progress.as_ref().and_then(|_| copied_file_bytes(&line));
             if let Ok(mut collected) = output.lock() {
                 collected.push_str(&line);
                 collected.push('\n');
@@ -417,6 +452,9 @@ fn stream_output<R: std::io::Read + Send + 'static>(
                     stream: name.into(),
                 },
             );
+            if let (Some(progress), Some(bytes)) = (&progress, copied_bytes) {
+                let _ = app.emit("file-transfer-progress", progress.add(bytes));
+            }
         }
     })
 }
@@ -459,6 +497,8 @@ fn command_arguments(config: &TransferConfig, dry_run: bool) -> Result<Vec<Strin
     args.extend([
         format!("/R:{}", config.retries),
         format!("/W:{}", config.retry_wait),
+        // Stable byte units let the guarded English per-file parser report real progress.
+        "/BYTES".into(),
     ]);
     if config.skip_junction_points {
         args.push("/XJ".into());
@@ -568,6 +608,70 @@ fn directory_entry(entry: fs::DirEntry) -> Result<DirectoryEntry, String> {
         is_hidden: attributes & 0x2 != 0,
         is_system: attributes & 0x4 != 0,
     })
+}
+
+fn directory_breadcrumbs(root: &Path) -> Vec<DirectoryBreadcrumb> {
+    let mut paths = Vec::new();
+    let mut current = Some(root);
+    while let Some(path) = current {
+        paths.push(path);
+        current = path.parent();
+    }
+    paths.reverse();
+    paths
+        .into_iter()
+        .map(|path| DirectoryBreadcrumb {
+            label: path
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+                .unwrap_or_else(|| display_path(path)),
+            path: display_path(path),
+        })
+        .collect()
+}
+
+#[derive(Clone)]
+struct ProgressTracker {
+    total_bytes: u64,
+    copied_bytes: std::sync::Arc<Mutex<u64>>,
+}
+
+impl ProgressTracker {
+    fn new(total_bytes: u64) -> Self {
+        Self {
+            total_bytes,
+            copied_bytes: std::sync::Arc::new(Mutex::new(0)),
+        }
+    }
+
+    fn add(&self, bytes: u64) -> ProgressEvent {
+        let copied_bytes = self
+            .copied_bytes
+            .lock()
+            .map(|mut value| {
+                *value = value.saturating_add(bytes).min(self.total_bytes);
+                *value
+            })
+            .unwrap_or(0);
+        ProgressEvent {
+            bytes_copied: copied_bytes,
+            total_bytes: self.total_bytes,
+            percent: ((copied_bytes.saturating_mul(100)) / self.total_bytes) as u8,
+        }
+    }
+}
+
+fn copied_file_bytes(line: &str) -> Option<u64> {
+    ["New File", "Newer", "Older", "Changed"]
+        .into_iter()
+        .find_map(|marker| {
+            line.split_once(marker).and_then(|(prefix, tail)| {
+                let prefix = prefix.trim();
+                (prefix.is_empty() || prefix.ends_with('%'))
+                    .then(|| tail.split_whitespace().next().and_then(number))
+                    .flatten()
+            })
+        })
 }
 
 fn selection_exclusions(config: &TransferConfig) -> Result<(Vec<String>, Vec<String>), String> {
@@ -996,6 +1100,12 @@ mod tests {
         assert_eq!(parsed.files_failed, Some(1));
         assert_eq!(parsed.bytes_copied, Some(40));
         assert_eq!(parse_summary("localized output").files_copied, None);
+    }
+    #[test]
+    fn progress_parser_accepts_only_completed_english_file_lines() {
+        assert_eq!(copied_file_bytes("100% New File 1048576 report.zip"), Some(1_048_576));
+        assert_eq!(copied_file_bytes("Newer 42 update.txt"), Some(42));
+        assert_eq!(copied_file_bytes("report named New File 99.txt"), None);
     }
     #[test]
     fn rejects_invalid_equal_and_nested_paths() {

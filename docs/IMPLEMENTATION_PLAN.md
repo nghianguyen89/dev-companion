@@ -11,11 +11,13 @@
   execution, cancellation, logs, and portable history.
 - Use direct `robocopy.exe` arguments, never a command shell. Mirror and
   system-location warnings require confirmation in both UI and native code.
-- Browse source/destination with direct-child Explorer lists. Source begins with
-  no selection; the native command builder excludes every unselected sibling,
+- Browse source/destination with direct-child Explorer lists, breadcrumb/Up
+  navigation and explicit hidden/system markers. Source begins with no
+  selection; the native command builder excludes every unselected sibling,
   including hidden/system items, before Robocopy starts.
-- Robocopy's output is streamed as events. Completion reports only parser
-  values that are present; otherwise the UI remains indeterminate.
+- Start runs a cancellable `/L` analysis first. Progress is determinate only
+  when its byte total and guarded English completed-file output are both
+  available; otherwise the UI remains indeterminate.
 
 ## 2026-09-17: Codex Environment Manager
 

@@ -38,13 +38,15 @@ export interface FileTransferConfig {
   excludeFolders: string[]; excludeFiles: string[]; selectionEnabled: boolean; selectedEntries: string[]; mirrorConfirmed: boolean; systemLocationConfirmed: boolean; destinationDataConfirmed: boolean;
 }
 export interface FileTransferDirectoryEntry { name: string; path: string; isDirectory: boolean; isHidden: boolean; isSystem: boolean; }
-export interface FileTransferDirectoryListing { path: string; entries: FileTransferDirectoryEntry[]; }
+export interface FileTransferDirectoryBreadcrumb { label: string; path: string; }
+export interface FileTransferDirectoryListing { path: string; parent: string | null; breadcrumbs: FileTransferDirectoryBreadcrumb[]; entries: FileTransferDirectoryEntry[]; }
 export interface FileTransferProfile { id: string; name: string; config: FileTransferConfig; }
 export interface FileTransferReadiness { available: boolean; path: string | null; }
 export interface FileTransferCommandPreview { command: string; arguments: string[]; warnings: string[]; }
 export interface FileTransferOutput { line: string; stream: "stdout" | "stderr"; }
+export interface FileTransferProgress { bytesCopied: number; totalBytes: number; percent: number; }
 export interface FileTransferSummary { filesCopied: number | null; filesSkipped: number | null; filesFailed: number | null; bytesCopied: number | null; }
-export interface FileTransferCompletion { state: "completed" | "completed-with-warning" | "failed"; exitCode: number | null; interpretation: { status: "success" | "warning" | "error"; message: string }; summary: FileTransferSummary; durationSeconds: number; logPath: string | null; verification: "Verified" | "Differences found" | "Verification failed" | null; }
+export interface FileTransferCompletion { phase: "analysis" | "transfer"; state: "completed" | "completed-with-warning" | "failed"; exitCode: number | null; interpretation: { status: "success" | "warning" | "error"; message: string }; summary: FileTransferSummary; durationSeconds: number; logPath: string | null; verification: "Verified" | "Differences found" | "Verification failed" | null; }
 export interface FileTransferHistoryEntry { id: string; startedAt: string; completedAt: string; source: string; destination: string; preset: FileTransferMode; status: string; bytesCopied: number | null; filesCopied: number | null; durationSeconds: number; exitCode: number | null; logPath: string | null; }
 
 export interface CodexEnvironment {

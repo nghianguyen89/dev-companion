@@ -345,8 +345,13 @@ pub async fn pick_file_transfer_folder(app: tauri::AppHandle, title: String) -> 
     Ok(app.dialog().file().set_title(title).blocking_pick_folder().and_then(|folder| folder.into_path().ok()).map(|path| path.display().to_string()))
 }
 #[tauri::command]
-pub async fn start_file_transfer(app: tauri::AppHandle, config: file_transfer::TransferConfig, analyze: bool) -> Result<file_transfer::Started, String> {
-    run_blocking(move || file_transfer::start(app, config, analyze)).await?
+pub async fn start_file_transfer(
+    app: tauri::AppHandle,
+    config: file_transfer::TransferConfig,
+    analyze: bool,
+    progress_total_bytes: Option<u64>,
+) -> Result<file_transfer::Started, String> {
+    run_blocking(move || file_transfer::start(app, config, analyze, progress_total_bytes)).await?
 }
 #[tauri::command]
 pub async fn cancel_file_transfer() -> Result<(), String> {

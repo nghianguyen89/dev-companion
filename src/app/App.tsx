@@ -1,6 +1,6 @@
 import { EnvironmentPage } from "../features/backup/EnvironmentPage";
 import { CodexEnvironmentsPage } from "../features/codex-environments/CodexEnvironmentsPage";
-import { FileTransferPage } from "../features/file-transfer/FileTransferPage";
+import { FileTransferPageUx as FileTransferPage } from "../features/file-transfer/FileTransferPageUx";
 import { CleanupPage } from "../features/cleanup/CleanupPage";
 import { useCallback, useState } from "react";
 import { BackupPage } from "../features/backup/BackupPage";
