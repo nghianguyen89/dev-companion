@@ -2,7 +2,7 @@
 
 ## Current 0.2.0 contract
 
-The Windows scope includes Codex environment archive v2, create-only file recovery, explicit catalog-cache cleanup, and three concrete personal adapters: Beyond Compare `.bcpkg`, SourceTree `bookmarks.xml`, and selected XAMPP files/configuration. See [USER_GUIDE.md](USER_GUIDE.md) and [STORAGE_AUDIT.md](STORAGE_AUDIT.md) for current included/excluded paths and limits. Desktop chat/database merging is **unfinished and unverified**.
+The Windows scope includes Codex environment archive v2, create-only file recovery, explicit catalog-cache cleanup, and concrete personal adapters: Beyond Compare `.bcpkg`, SourceTree bookmarks/full encrypted local configuration, and selected XAMPP files/configuration. See [USER_GUIDE.md](USER_GUIDE.md) and [STORAGE_AUDIT.md](STORAGE_AUDIT.md) for current included/excluded paths and limits. Desktop chat/database merging is **unfinished and unverified**.
 
 Environment ZIP uses `environment-manifest.json` with version 2, kind, timestamp, platform, CLI version and entries (`path`, `group`, `bytes`, `sha256`, `manual`). Inspection checks the complete ZIP inventory and every SHA-256; automatic restore never writes manual database/index/settings components. Session `manifest.json` v1 remains supported; `delete-manifest.json` v1 now uses the existing inspection/restore UI. Missing destination sessions folders are supported, and failed rollback is reported.
 
@@ -41,6 +41,18 @@ The local home contained 167 legacy rollout files at `sessions/YYYY/MM/DD/rollou
 ## Logging
 
 Set `CODEX_COMPANION_LOG=info` or `debug` only while diagnosing. Do not log conversation content, credentials, or auth tokens.
+
+## First-response debug checklist
+
+1. Run `pnpm check`, `pnpm lint`, `pnpm test`, and `cargo check --manifest-path src-tauri/Cargo.toml` from the repository root.
+2. For UI/native reproduction, use `$env:CODEX_COMPANION_LOG = 'debug'; pnpm tauri dev` in the same PowerShell session.
+3. For a generated release, run `./build-publish.ps1` only after closing the running portable executable. It rebuilds the portable EXE and NSIS installer.
+4. Record the command, exact error, Windows version, and whether the run was portable or installed. Never include archive passwords, session contents, OAuth/token material, or credential files.
+
+If pnpm cannot read its per-user AppData configuration, retry from a normal user
+PowerShell after checking that no security tool is locking that file; do not
+delete pnpm configuration as a first response. `docs/DEBUG_NOTES.md` records
+known regressions and their verified fixes.
 # Milestone 6 validation notes
 
 Deletion tests cover legacy metadata aliases, malformed/unsupported metadata, duplicate/missing selections, archive naming collisions, and injected delete rollback. The security contract is local-only legacy sessions: no speculative support for newer Codex storage formats, no cloud/Desktop deletion, no arbitrary filesystem paths, no symlink following, and no overwrite during recovery.

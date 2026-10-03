@@ -1,5 +1,9 @@
 use serde::{Deserialize, Serialize};
-use std::{fs, path::PathBuf};
+use std::{
+    fs,
+    io::Write,
+    path::{Path, PathBuf},
+};
 use thiserror::Error;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -33,7 +37,10 @@ pub enum LogLevel {
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
-pub enum Language { En, Vi }
+pub enum Language {
+    En,
+    Vi,
+}
 
 impl Default for AppConfiguration {
     fn default() -> Self {
@@ -58,24 +65,45 @@ pub enum ConfigurationError {
 }
 
 fn config_file() -> PathBuf {
-    crate::platform::portable_root().unwrap_or_else(crate::platform::app_data_dir)
+    crate::platform::portable_root()
+        .unwrap_or_else(crate::platform::app_data_dir)
         .join("config")
         .join("settings.json")
 }
 pub fn load() -> Result<AppConfiguration, ConfigurationError> {
-    let path = config_file();
+    load_from(&config_file())
+}
+
+fn load_from(path: &Path) -> Result<AppConfiguration, ConfigurationError> {
     if !path.exists() {
         return Ok(AppConfiguration::default());
     }
     Ok(serde_json::from_slice(&fs::read(path)?)?)
 }
+
 pub fn save(configuration: &AppConfiguration) -> Result<(), ConfigurationError> {
-    let path = config_file();
+    save_to(&config_file(), configuration)
+}
+
+fn save_to(path: &Path, configuration: &AppConfiguration) -> Result<(), ConfigurationError> {
     let directory = path.parent().expect("settings parent");
-    fs::create_dir_all(&directory)?;
+    fs::create_dir_all(directory)?;
     let content = serde_json::to_vec_pretty(configuration)?;
-    fs::write(path, content)?;
-    Ok(())
+    let temporary = path.with_extension(format!("{}.tmp", std::process::id()));
+    let result = (|| -> std::io::Result<()> {
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temporary)?;
+        file.write_all(&content)?;
+        file.sync_all()?;
+        drop(file);
+        fs::rename(&temporary, path)
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&temporary);
+    }
+    result.map_err(ConfigurationError::Read)
 }
 
 #[cfg(test)]
@@ -97,5 +125,19 @@ mod tests {
         assert_eq!(serialized["language"], "vi");
         let restored: AppConfiguration = serde_json::from_value(serialized).unwrap();
         assert!(matches!(restored.language, Language::Vi));
+    }
+
+    #[test]
+    fn save_replaces_the_configuration_with_a_readable_complete_file() {
+        let root =
+            std::env::temp_dir().join(format!("companion-config-test-{}", std::process::id()));
+        let path = root.join("config").join("settings.json");
+        let mut configuration = AppConfiguration::default();
+        save_to(&path, &configuration).unwrap();
+        configuration.language = Language::Vi;
+        save_to(&path, &configuration).unwrap();
+        assert!(matches!(load_from(&path).unwrap().language, Language::Vi));
+        assert!(serde_json::from_slice::<serde_json::Value>(&fs::read(&path).unwrap()).is_ok());
+        fs::remove_dir_all(root).unwrap();
     }
 }

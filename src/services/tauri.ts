@@ -1,8 +1,14 @@
-import { invoke } from "@tauri-apps/api/core";
-import type { CodexContentActionResult, CodexPetsOverview, CodexSkillsOverview } from "../types/codex";
-import type { AppConfiguration, ArchiveInspection, BackupPreview, BackupResult, BeyondCompareBundleInspection, BeyondCompareBundlePreview, BeyondCompareReadiness, BeyondCompareRecoveryPreview, CodexEnvironmentActionResult, CodexEnvironmentInput, CodexEnvironmentInstructions, CodexEnvironmentOverview, CodexPaths, CompressionCommandPreview, CompressionConfig, CompressionReadiness, CompressionSourceTree, ConversationDiscovery, DeletePreview, DeleteResult, DiagnosticsSnapshot, FileTransferCommandPreview, FileTransferConfig, FileTransferDirectoryListing, FileTransferHistoryEntry, FileTransferReadiness, RestoreHistoryEntry, RestorePreview, RestoreResult, SourceTreeInspection, SourceTreePreview, SourceTreeReadiness, SourceTreeRecoveryPreview, XamppInspection, XamppPreview, XamppReadiness, XamppRecoveryPreview } from "../types/codex";
+import { invoke as invokeNative } from "@tauri-apps/api/core";
+import type { AppConfiguration, ArchiveInspection, BackupPreview, BackupResult, BackupStorageOverview, BeyondCompareBundleInspection, BeyondCompareBundlePreview, BeyondCompareReadiness, BeyondCompareRecoveryPreview, CodexContentActionResult, CodexEnvironmentActionResult, CodexEnvironmentInput, CodexEnvironmentInstructions, CodexEnvironmentOverview, CodexPaths, CodexPetsOverview, CodexSkillsOverview, CompressionCommandPreview, CompressionConfig, CompressionReadiness, CompressionSourceTree, ConversationDiscovery, DeletePreview, DeleteResult, DiagnosticsSnapshot, FileTransferCommandPreview, FileTransferConfig, FileTransferDirectoryListing, FileTransferHistoryEntry, FileTransferReadiness, RestoreHistoryEntry, RestorePreview, RestoreResult, SourceTreeInspection, SourceTreePreview, SourceTreeReadiness, SourceTreeRecoveryPreview, XamppInspection, XamppPreview, XamppReadiness, XamppRecoveryPreview } from "../types/codex";
 
-export const getDiagnostics = (): Promise<DiagnosticsSnapshot> => invoke("get_diagnostics");
+export const isTauriRuntime = () => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+const browserPreviewConfiguration: AppConfiguration = { theme: "system", portableMode: false, createSafetyBackups: true, language: "en", logLevel: "warn", codexEnvironments: [], fileTransferProfiles: [] };
+const browserPreviewDiagnostics: DiagnosticsSnapshot = { operatingSystem: "unknown", architecture: "Browser preview", codexHome: "—", codexHomeExists: false, configDir: "—", backupDir: "—", codexCliVersion: null, skillsCount: 0, petsCount: 0 };
+const browserPreviewBackupStorage: BackupStorageOverview = { sessionBackups: { directory: "—", fileCount: 0, totalBytes: 0, recentFiles: [] }, personalBundles: { directory: "—", fileCount: 0, totalBytes: 0, recentFiles: [] } };
+const invoke = <T>(command: string, args?: Record<string, unknown>): Promise<T> => isTauriRuntime() ? invokeNative<T>(command, args) : Promise.reject(new Error("Native actions are available only in the Dev Companion desktop app."));
+
+export const getDiagnostics = (): Promise<DiagnosticsSnapshot> => isTauriRuntime() ? invoke("get_diagnostics") : Promise.resolve(browserPreviewDiagnostics);
+export const getBackupStorage = (): Promise<BackupStorageOverview> => isTauriRuntime() ? invoke("get_backup_storage") : Promise.resolve(browserPreviewBackupStorage);
 export const getSkills = (): Promise<CodexSkillsOverview> => invoke("get_skills");
 export const importSkill = (): Promise<CodexContentActionResult | null> => invoke("import_skill");
 export const exportSkill = (id: string): Promise<CodexContentActionResult | null> => invoke("export_skill", { id });
@@ -31,15 +37,22 @@ export const createSourceTreeBundle = (token: string): Promise<{ bundleName: str
 export const inspectSourceTreeBundle = (): Promise<SourceTreeInspection | null> => invoke("inspect_sourcetree_bundle");
 export const previewSourceTreeRecovery = (token: string): Promise<SourceTreeRecoveryPreview> => invoke("preview_sourcetree_recovery", { token });
 export const recoverSourceTree = (token: string, confirmation: string): Promise<{ recovered: boolean; stagingPath: string; manualOnly: boolean }> => invoke("recover_sourcetree", { token, confirmation });
+export const previewSourceTreeConfig = (): Promise<import("../types/codex").SourceTreeConfigPreview> => invoke("preview_sourcetree_config");
+export const createSourceTreeConfigBundle = (token: string, password: string): Promise<{ bundleName: string; bundlePath: string; bytes: number }> => invoke("create_sourcetree_config_bundle", { token, password });
+export const openSourceTreeConfigBundleFolder = (): Promise<void> => invoke("open_sourcetree_config_bundle_folder");
+export const inspectSourceTreeConfigBundle = (password: string): Promise<import("../types/codex").SourceTreeConfigInspection | null> => invoke("inspect_sourcetree_config_bundle", { password });
+export const previewSourceTreeConfigRecovery = (token: string, password: string): Promise<import("../types/codex").SourceTreeConfigRecoveryPreview> => invoke("preview_sourcetree_config_recovery", { token, password });
+export const recoverSourceTreeConfig = (token: string, confirmation: string, password: string): Promise<import("../types/codex").SourceTreeConfigRecoveryResult> => invoke("recover_sourcetree_config", { token, confirmation, password });
+export const deleteSourceTreeConfigBundle = (token: string, confirmation: string): Promise<void> => invoke("delete_sourcetree_config_bundle", { token, confirmation });
 export const getXamppReadiness = (): Promise<XamppReadiness> => invoke("get_xampp_readiness");
 export const previewXampp = (): Promise<XamppPreview | null> => invoke("preview_xampp");
 export const createXamppBundle = (token: string): Promise<{ bundleName: string; bytes: number }> => invoke("create_xampp_bundle", { token });
 export const inspectXamppBundle = (): Promise<XamppInspection | null> => invoke("inspect_xampp_bundle");
 export const previewXamppRecovery = (token: string): Promise<XamppRecoveryPreview> => invoke("preview_xampp_recovery", { token });
 export const recoverXampp = (token: string, confirmation: string): Promise<{ recovered: boolean; stagingPath: string; manualOnly: boolean }> => invoke("recover_xampp", { token, confirmation });
-export const getConfiguration = (): Promise<AppConfiguration> => invoke("get_configuration");
+export const getConfiguration = (): Promise<AppConfiguration> => isTauriRuntime() ? invoke("get_configuration") : Promise.resolve(browserPreviewConfiguration);
 export const saveConfiguration = (configuration: AppConfiguration): Promise<void> =>
-  invoke("save_configuration", { configuration });
+  isTauriRuntime() ? invoke("save_configuration", { configuration }) : Promise.resolve();
 export const getCodexEnvironmentOverview = (): Promise<CodexEnvironmentOverview> => invoke("get_codex_environment_overview");
 export const saveCodexEnvironment = (input: CodexEnvironmentInput) => invoke("save_codex_environment", { input });
 export const regenerateCodexLauncher = (id: string): Promise<CodexEnvironmentActionResult> => invoke("regenerate_codex_launcher", { id });
@@ -60,6 +73,7 @@ export const startFileTransfer = (config: FileTransferConfig, analyze: boolean, 
 export const cancelFileTransfer = (): Promise<void> => invoke("cancel_file_transfer");
 export const getFileTransferHistory = (): Promise<FileTransferHistoryEntry[]> => invoke("get_file_transfer_history");
 export const openFileTransferLog = (path: string): Promise<void> => invoke("open_file_transfer_log", { path });
+export const deleteFileTransferLog = (id: string): Promise<void> => invoke("delete_file_transfer_log", { id });
 export const openFileTransferLogsFolder = (): Promise<void> => invoke("open_file_transfer_logs_folder");
 export const getCompressionReadiness = (): Promise<CompressionReadiness> => invoke("get_compression_readiness");
 export const scanCompressionSource = (source: string): Promise<CompressionSourceTree> => invoke("scan_compression_source", { source });

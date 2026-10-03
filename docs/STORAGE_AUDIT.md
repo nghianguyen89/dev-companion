@@ -66,6 +66,18 @@ trusted encrypted transport; cloud sync is not available. Recovery extracts only
 to Companion-owned staging, rechecks the intended SourceTree location for a
 manual conflict preview, and never applies configuration to SourceTree.
 
+## SourceTree full local configuration boundary
+
+The separate full-configuration workflow requires SourceTree to be closed and
+accepts only direct local files named `accounts.json`, `bookmarks.xml`,
+`customactions.xml`, `hostedaccounts.xml`, `opentabs.xml`, `passwd`,
+`userhosts`, and the current `user.config`. It returns names and byte counts,
+not contents. New bundles encrypt every ZIP entry with AES-256; the password is
+command-only and is not stored in settings, manifests, logs, history, or plans.
+Existing target files get a Companion-owned safety copy and a later write failure
+rolls back restored files. Windows Credential Manager, OAuth/DPAPI-bound secrets
+and SSH keys remain excluded because they are not portable file settings.
+
 ## XAMPP files boundary
 
 The Phase 3 file workflow detects a local Windows XAMPP root (`XAMPP_HOME` or

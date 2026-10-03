@@ -17,3 +17,5 @@
 .file-transfer-progress { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px 10px; align-items: center; }
 .file-transfer-progress progress { width: 100%; height: 16px; accent-color: #8ac7ff; }
 .file-transfer-progress span { grid-column: 1 / -1; color: #aeb8ca; font-size: 12px; }
+.file-transfer-log-actions { display: grid; gap: 7px; }
+.file-transfer-log-actions button { width: 100%; }

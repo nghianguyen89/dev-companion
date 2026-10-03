@@ -1,11 +1,18 @@
-use std::{fs, io, path::{Component, Path}};
+use std::{
+    fs, io,
+    path::{Component, Path},
+};
 
 pub fn linked(metadata: &fs::Metadata) -> bool {
-    #[cfg(windows)] {
+    #[cfg(windows)]
+    {
         use std::os::windows::fs::MetadataExt;
         metadata.file_attributes() & 0x400 != 0
     }
-    #[cfg(not(windows))] { metadata.file_type().is_symlink() }
+    #[cfg(not(windows))]
+    {
+        metadata.file_type().is_symlink()
+    }
 }
 
 /// Inspect every existing ancestor, including CODEX_HOME itself. Never follow reparse points.
@@ -25,11 +32,21 @@ pub fn check(path: &Path) -> Result<(), String> {
 }
 
 pub fn relative(name: &str) -> Result<(), String> {
-    if name.is_empty() || name.contains(['\\', ':', '\0']) || name.split('/').any(|p| {
-        let stem = p.split('.').next().unwrap_or("").to_ascii_uppercase();
-        p.is_empty() || p == "." || p == ".." || p.ends_with(['.', ' ']) ||
-        matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL") ||
-        (stem.len() == 4 && (stem.starts_with("COM") || stem.starts_with("LPT")) && stem.as_bytes()[3].is_ascii_digit())
-    }) { return Err("Rejected unsafe archive path.".into()); }
+    if name.is_empty()
+        || name.contains(['\\', ':', '\0'])
+        || name.split('/').any(|p| {
+            let stem = p.split('.').next().unwrap_or("").to_ascii_uppercase();
+            p.is_empty()
+                || p == "."
+                || p == ".."
+                || p.ends_with(['.', ' '])
+                || matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+                || (stem.len() == 4
+                    && (stem.starts_with("COM") || stem.starts_with("LPT"))
+                    && stem.as_bytes()[3].is_ascii_digit())
+        })
+    {
+        return Err("Rejected unsafe archive path.".into());
+    }
     Ok(())
 }

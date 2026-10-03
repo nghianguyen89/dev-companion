@@ -15,16 +15,26 @@ pub struct Readiness {
 }
 
 pub fn readiness() -> Readiness {
-    Readiness { supported: cfg!(windows), secret_export_acknowledgement_required: true }
+    Readiness {
+        supported: cfg!(windows),
+        secret_export_acknowledgement_required: true,
+    }
 }
 
 pub fn validate_package(path: &Path) -> Result<u64, String> {
-    if !cfg!(windows) { return Err("Beyond Compare migration currently supports Windows only.".into()); }
-    if !path.is_absolute() || !path.extension().is_some_and(|extension| extension.eq_ignore_ascii_case("bcpkg")) {
+    if !cfg!(windows) {
+        return Err("Beyond Compare migration currently supports Windows only.".into());
+    }
+    if !path.is_absolute()
+        || !path
+            .extension()
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("bcpkg"))
+    {
         return Err("Choose a Beyond Compare .bcpkg package.".into());
     }
     fs_safety::check(path)?;
-    let metadata = fs::symlink_metadata(path).map_err(|_| "Cannot read the selected package.".to_string())?;
+    let metadata =
+        fs::symlink_metadata(path).map_err(|_| "Cannot read the selected package.".to_string())?;
     if fs_safety::linked(&metadata) || !metadata.is_file() || metadata.len() > MAX_PACKAGE_BYTES {
         return Err("The selected package is unsupported or exceeds the 512 MiB limit.".into());
     }

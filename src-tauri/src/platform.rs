@@ -47,9 +47,19 @@ pub fn backup_dir(configuration: &AppConfiguration) -> PathBuf {
     app_data_dir().join("backups")
 }
 
-/// Personal bundles and recovered app packages remain Companion-owned, not in app roots.
-pub fn personal_bundle_dir() -> PathBuf { app_data_dir().join("personal-bundles") }
-pub fn personal_staging_dir() -> PathBuf { app_data_dir().join("staging") }
+fn personal_bundle_dir_at(portable: Option<PathBuf>) -> PathBuf {
+    portable
+        .map(|root| root.join("backup"))
+        .unwrap_or_else(|| app_data_dir().join("personal-bundles"))
+}
+
+/// Personal bundles stay beside the portable executable when its marker is present.
+pub fn personal_bundle_dir() -> PathBuf {
+    personal_bundle_dir_at(portable_root())
+}
+pub fn personal_staging_dir() -> PathBuf {
+    app_data_dir().join("staging")
+}
 
 pub fn restore_history_file(configuration: &AppConfiguration) -> PathBuf {
     config_dir(configuration).join("restore-history-v1.json")
@@ -64,4 +74,17 @@ pub fn delete_quarantine_dir(configuration: &AppConfiguration) -> PathBuf {
         }
     }
     app_data_dir().join("quarantine")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn portable_personal_bundles_stay_with_the_executable() {
+        assert_eq!(
+            personal_bundle_dir_at(Some(PathBuf::from(r"D:\Portable\Dev Companion"))),
+            PathBuf::from(r"D:\Portable\Dev Companion\backup")
+        );
+    }
 }

@@ -13,7 +13,8 @@ Release/version: 0.2.0
 ## Working Features
 
 - Windows-only local migration workflows for Codex environment files, Beyond
-  Compare packages, SourceTree bookmarks and selected XAMPP projects/config.
+  Compare packages, SourceTree personal configuration and selected XAMPP
+  projects/config.
 - Native commands perform blocking filesystem, process and dialog work away
   from the window thread while retaining serialized operations.
 - Conversations table reuses its per-language date formatter, keeping filters
@@ -38,6 +39,19 @@ Release/version: 0.2.0
   create-new installation, and `REMOVE`-confirmed deletion limited to the
   selected direct pet folder. These workflows never read authentication or
   display skill bodies.
+- SourceTree personal configuration: a sensitive closed-app AES-256 bundle
+  includes detected `accounts.json`, `bookmarks.xml`, `customactions.xml`,
+  `hostedaccounts.xml`, `opentabs.xml`, `passwd`, `userhosts`, and the current
+  `user.config`; direct restore needs `RESTORE`, takes a safety copy, and
+  exposes a post-restore `DELETE` action. Windows Vault, OAuth/DPAPI-bound
+  secrets and SSH keys remain excluded, so target-machine sign-in may still be
+  required.
+- Portable personal bundles are written to `backup/` beside `dev-companion.exe`
+  when the adjacent `portable-mode` marker is present; installed builds retain
+  the existing AppData location.
+- Dashboard is the first navigation group and shows current local feature
+  counts plus read-only direct-file inventories for session backups and
+  personal application bundles.
 
 ### Phase 0–1 addition
 

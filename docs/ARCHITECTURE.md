@@ -28,7 +28,7 @@ React features -> services/tauri.ts -> Tauri commands -> codex/session_storage/p
 ## Native layer
 
 - `platform.rs`: the only place that resolves OS-dependent paths. `CODEX_HOME` overrides the default `~/.codex` location.
-- `codex.rs`: read-only diagnostics and CLI version probes.
+- `codex.rs`: read-only diagnostics, CLI version probes and direct-file backup inventory; it never reads archive contents.
 - `codex_content.rs`: concrete local skills/pets adapter. It lists only direct
   supported metadata, imports/exports skills and installs pets with new-folder
   semantics, and removes only a confirmed direct pet after reparse-point and
@@ -59,7 +59,7 @@ cell during every table render.
 
 ## Portable mode
 
-Portable mode requires a `portable-mode` marker file adjacent to the executable. When enabled in settings and the marker is present, Companion stores its own config and backups alongside the executable in `config/` and `backups/`. It does not move or rewrite Codex data.
+Portable mode requires a `portable-mode` marker file adjacent to the executable. When its setting is enabled and the marker is present, Companion stores its own config and backups alongside the executable in `config/` and `backups/`; personal application bundles use the adjacent `backup/` folder whenever the marker is present so they travel with `dev-companion.exe`. It does not move or rewrite Codex data.
 
 ## Safety boundary
 
@@ -114,6 +114,18 @@ checks `tasklist.exe` and never terminates it. Recovery always writes a fresh
 `bookmarks.xml` to Companion-owned staging after token, archive hash/inventory,
 and destination-state revalidation. The regular SourceTree location is shown as
 a conflict/manual-placement preview only; Companion never writes or imports it.
+
+`sourcetree_config.rs` is the separate direct-restore workflow for personal
+SourceTree file settings. It accepts only the named local settings files
+(`accounts.json`, `bookmarks.xml`, `customactions.xml`, `hostedaccounts.xml`,
+`opentabs.xml`, `passwd`, `userhosts`, and the current `user.config`), reports
+filenames and byte counts rather than contents, and verifies manifest,
+inventory and hashes before restoring. New version-2 bundles encrypt every
+entry with AES-256; passwords are command-only and never enter plans, settings,
+manifests, logs, or history. Version-1 unencrypted bundles remain readable.
+Existing files get a Companion-owned safety copy and restore rolls back on
+later write failures. Windows Vault, OAuth/DPAPI-bound secrets and SSH keys
+remain out of scope because they are not portable file settings.
 
 ## Phase 3 XAMPP files boundary
 

@@ -95,6 +95,15 @@ fn default_home() -> Result<PathBuf, String> {
 fn display(path: &Path) -> String {
     path.to_string_lossy().to_string()
 }
+fn background_command(program: impl AsRef<std::ffi::OsStr>) -> Command {
+    let mut command = Command::new(program);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x0800_0000);
+    }
+    command
+}
 
 fn expand_user_home(value: &str) -> Result<PathBuf, String> {
     let trimmed = value.trim();
@@ -183,7 +192,7 @@ fn default_environment() -> Result<Environment, String> {
 
 fn cli_status() -> CliStatus {
     #[cfg(windows)]
-    let path = Command::new("where.exe")
+    let path = background_command("where.exe")
         .arg("codex")
         .output()
         .ok()
@@ -198,7 +207,7 @@ fn cli_status() -> CliStatus {
         });
     #[cfg(not(windows))]
     let path = None;
-    let version = Command::new("codex")
+    let version = background_command("codex")
         .arg("--version")
         .output()
         .ok()
@@ -216,7 +225,7 @@ fn login_status(home: &Path, installed: bool) -> String {
     if !installed {
         return "unknown".into();
     }
-    match Command::new("codex")
+    match background_command("codex")
         .args(["login", "status"])
         .env("CODEX_HOME", home)
         .output()
@@ -624,9 +633,10 @@ pub fn update_instructions(id: &str, content: &str) -> Result<ActionResult, Stri
         String::new()
     };
     let updated = replace_managed_block(&existing, content.trim())?;
-    if existed { backup(&path)?; }
-    fs::write(&path, updated)
-        .map_err(|_| "Could not update AGENTS.md.")?;
+    if existed {
+        backup(&path)?;
+    }
+    fs::write(&path, updated).map_err(|_| "Could not update AGENTS.md.")?;
     configuration.codex_environments[index].manages_instructions = true;
     configuration.codex_environments[index].updated_at = now()?;
     config::save(&configuration).map_err(|error| error.to_string())?;

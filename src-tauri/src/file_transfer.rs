@@ -299,20 +299,29 @@ pub fn list_history(
 }
 
 pub fn open_log(configuration: &config::AppConfiguration, value: &str) -> Result<(), String> {
-    let root = logs_dir(configuration)
-        .canonicalize()
-        .map_err(|_| "File transfer logs are unavailable.")?;
-    let path = Path::new(value)
-        .canonicalize()
-        .map_err(|_| "The transfer log is unavailable.")?;
-    if !path.starts_with(&root) || !path.is_file() {
-        return Err("The transfer log is unavailable.".into());
-    }
+    let path = verified_log_path(configuration, value)?;
     Command::new("explorer.exe")
         .arg(format!("/select,{}", path.display()))
         .spawn()
         .map_err(|_| "Unable to open the transfer log.")?;
     Ok(())
+}
+
+pub fn delete_log(configuration: &config::AppConfiguration, id: &str) -> Result<(), String> {
+    let history_path = history_path(configuration);
+    let mut entries = read_history(&history_path)?;
+    let index = entries
+        .iter()
+        .position(|entry| entry.id == id)
+        .ok_or("The transfer log is unavailable.")?;
+    let log_path = entries[index]
+        .log_path
+        .as_deref()
+        .ok_or("The transfer log is unavailable.")?;
+    let path = verified_log_path(configuration, log_path)?;
+    fs::remove_file(path).map_err(|_| "Unable to delete the transfer log.")?;
+    entries.remove(index);
+    write_history(&history_path, entries)
 }
 
 pub fn open_logs_folder(configuration: &config::AppConfiguration) -> Result<(), String> {
@@ -343,7 +352,13 @@ fn run_transfer(
         .flatten()
         .map(ProgressTracker::new);
     let stdout_thread = stdout.map(|stream| {
-        stream_output(app.clone(), stream, "stdout", output.clone(), progress.clone())
+        stream_output(
+            app.clone(),
+            stream,
+            "stdout",
+            output.clone(),
+            progress.clone(),
+        )
     });
     let stderr_thread =
         stderr.map(|stream| stream_output(app.clone(), stream, "stderr", output.clone(), None));
@@ -940,6 +955,28 @@ fn history_path(configuration: &config::AppConfiguration) -> PathBuf {
     platform::config_dir(configuration).join("file-transfer-history-v1.json")
 }
 
+fn verified_log_path(
+    configuration: &config::AppConfiguration,
+    value: &str,
+) -> Result<PathBuf, String> {
+    let root = logs_dir(configuration)
+        .canonicalize()
+        .map_err(|_| "File transfer logs are unavailable.")?;
+    let candidate = Path::new(value);
+    let metadata =
+        fs::symlink_metadata(candidate).map_err(|_| "The transfer log is unavailable.")?;
+    if metadata.file_type().is_symlink() || !metadata.is_file() {
+        return Err("The transfer log is unavailable.".into());
+    }
+    let path = candidate
+        .canonicalize()
+        .map_err(|_| "The transfer log is unavailable.")?;
+    if !path.starts_with(&root) {
+        return Err("The transfer log is unavailable.".into());
+    }
+    Ok(path)
+}
+
 fn write_log(
     configuration: &config::AppConfiguration,
     config: &TransferConfig,
@@ -997,6 +1034,10 @@ fn record_history(path: &Path, entry: TransferHistoryEntry) -> Result<(), String
     let mut entries = read_history(path)?;
     entries.insert(0, entry);
     entries.truncate(MAX_HISTORY_ENTRIES);
+    write_history(path, entries)
+}
+
+fn write_history(path: &Path, entries: Vec<TransferHistoryEntry>) -> Result<(), String> {
     fs::write(
         path,
         serde_json::to_vec_pretty(&HistoryFile {
@@ -1079,7 +1120,9 @@ mod tests {
         let arguments = command_arguments(&config(TransferMode::FastCopy), false).unwrap();
         assert!(arguments.contains(&"/COPY:DT".into()));
         assert!(arguments.contains(&"/DCOPY:T".into()));
-        assert!(!arguments.iter().any(|argument| argument.contains("COPY:DAT")));
+        assert!(!arguments
+            .iter()
+            .any(|argument| argument.contains("COPY:DAT")));
     }
     #[test]
     fn exit_codes_are_not_generic_failures() {
@@ -1103,7 +1146,10 @@ mod tests {
     }
     #[test]
     fn progress_parser_accepts_only_completed_english_file_lines() {
-        assert_eq!(copied_file_bytes("100% New File 1048576 report.zip"), Some(1_048_576));
+        assert_eq!(
+            copied_file_bytes("100% New File 1048576 report.zip"),
+            Some(1_048_576)
+        );
         assert_eq!(copied_file_bytes("Newer 42 update.txt"), Some(42));
         assert_eq!(copied_file_bytes("report named New File 99.txt"), None);
     }

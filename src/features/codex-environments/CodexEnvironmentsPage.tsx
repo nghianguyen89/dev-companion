@@ -24,8 +24,8 @@ export function CodexEnvironmentsPage() {
   };
   const edit = (environment: CodexEnvironmentStatus) => setForm({ id: environment.id, displayName: environment.displayName, commandAlias: environment.commandAlias, codexHome: environment.codexHome, description: environment.description ?? "" });
   const editInstructions = (environment: CodexEnvironmentStatus) => void run(async () => { const value = await getCodexEnvironmentInstructions(environment.id); setInstructions({ id: environment.id, content: value.content }); }, false);
-  const remove = (environment: CodexEnvironmentStatus) => { if (window.prompt(`${t("codexAccounts.removeEntry")}: type DELETE`) === "DELETE") void run(() => deleteCodexEnvironment(environment.id, "DELETE")); };
-  const removeScript = (environment: CodexEnvironmentStatus) => { if (window.prompt(`${t("codexAccounts.removeLauncher")}: type REMOVE`) === "REMOVE") void run(() => removeCodexLauncher(environment.id, "REMOVE")); };
+  const remove = (environment: CodexEnvironmentStatus) => { if (window.prompt(t("codexAccounts.confirmDelete")) === "DELETE") void run(() => deleteCodexEnvironment(environment.id, "DELETE")); };
+  const removeScript = (environment: CodexEnvironmentStatus) => { if (window.prompt(t("codexAccounts.confirmRemoveLauncher")) === "REMOVE") void run(() => removeCodexLauncher(environment.id, "REMOVE")); };
   return <>
     <PageHeader title={t("codexAccounts.title")} description={t("codexAccounts.description")} action={<button type="button" onClick={() => void run(async () => undefined)} disabled={busy}>{t("codexAccounts.check")}</button>} />
     <section className="codex-environment-card">

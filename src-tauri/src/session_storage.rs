@@ -61,17 +61,40 @@ struct SessionMetadata {
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
-enum SessionSource { Name(String), Agent { subagent: SubagentSource } }
+enum SessionSource {
+    Name(String),
+    Agent { subagent: SubagentSource },
+}
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
-enum SubagentSource { Other(String), ThreadSpawn { parent_thread_id: String, depth: u32, agent_path: String, agent_nickname: Option<String>, agent_role: Option<String> } }
+enum SubagentSource {
+    Other(String),
+    ThreadSpawn {
+        parent_thread_id: String,
+        depth: u32,
+        agent_path: String,
+        agent_nickname: Option<String>,
+        agent_role: Option<String>,
+    },
+}
 
 impl SessionSource {
     fn label(&self) -> String {
         match self {
             Self::Name(name) => name.clone(),
-            Self::Agent { subagent: SubagentSource::Other(name) } => format!("subagent:{name}"),
-            Self::Agent { subagent: SubagentSource::ThreadSpawn { parent_thread_id, depth, agent_path, agent_nickname, agent_role } } => {
+            Self::Agent {
+                subagent: SubagentSource::Other(name),
+            } => format!("subagent:{name}"),
+            Self::Agent {
+                subagent:
+                    SubagentSource::ThreadSpawn {
+                        parent_thread_id,
+                        depth,
+                        agent_path,
+                        agent_nickname,
+                        agent_role,
+                    },
+            } => {
                 let _ = (parent_thread_id, depth, agent_nickname, agent_role);
                 format!("subagent:{agent_path}")
             }
@@ -175,7 +198,9 @@ pub(crate) fn selected_sessions(
             .ok_or_else(|| format!("Selected conversation is unavailable or unsupported: {id}"))?;
         verify_regular_file_within(&source_path, &root)
             .map_err(|_| format!("Selected conversation cannot be read safely: {id}"))?;
-        let source_path = source_path.canonicalize().map_err(|_| format!("Selected conversation cannot be read: {id}"))?;
+        let source_path = source_path
+            .canonicalize()
+            .map_err(|_| format!("Selected conversation cannot be read: {id}"))?;
         let relative = source_path.strip_prefix(&root).map_err(|_| {
             "Rejected a session path outside the Codex sessions directory.".to_string()
         })?;
@@ -218,11 +243,14 @@ pub(crate) fn canonical_sessions_root(home: &Path) -> Result<PathBuf, String> {
 /// avoids accepting a UI supplied path and rejects symlinks rather than traversing them.
 pub(crate) fn verify_regular_file_within(path: &Path, root: &Path) -> Result<(), String> {
     crate::fs_safety::check(path)?;
-    let metadata = fs::symlink_metadata(path).map_err(|_| "Selected session is unavailable.".to_string())?;
+    let metadata =
+        fs::symlink_metadata(path).map_err(|_| "Selected session is unavailable.".to_string())?;
     if metadata.file_type().is_symlink() || !metadata.is_file() {
         return Err("Selected session is not a regular file.".into());
     }
-    let canonical = path.canonicalize().map_err(|_| "Selected session is unavailable.".to_string())?;
+    let canonical = path
+        .canonicalize()
+        .map_err(|_| "Selected session is unavailable.".to_string())?;
     if !canonical.starts_with(root) {
         return Err("Rejected a session path outside the Codex sessions directory.".into());
     }
@@ -276,9 +304,10 @@ fn collect_session_files(
             *unsupported += 1;
         } else if file_type.is_dir() {
             collect_session_files(&path, files, unsupported)?;
-        } else if file_type.is_file() && path
-            .extension()
-            .is_some_and(|extension| extension == "jsonl")
+        } else if file_type.is_file()
+            && path
+                .extension()
+                .is_some_and(|extension| extension == "jsonl")
         {
             files.push(path);
         } else {
@@ -323,14 +352,26 @@ fn parse_session_metadata_line(
     normalize_session_metadata(record, index)
 }
 
-pub(crate) fn validate_restorable_session_metadata(bytes: &[u8], expected_id: &str) -> Result<(), &'static str> {
-    let first = bytes.split(|byte| *byte == b'\n').next().ok_or("Archive session is empty.")?;
-    let first_line = std::str::from_utf8(first).map_err(|_| "Archive session is not UTF-8 JSONL metadata.")?;
-    let summary = parse_session_metadata_line(first_line, &SessionIndex::default()).map_err(|error| match error {
-        ParseError::Unsupported => "Archive session uses an unsupported Codex metadata format.",
-        ParseError::Malformed => "Archive session is not valid Codex metadata.",
-        ParseError::Unreadable => "Archive session metadata is unreadable.",
-    })?;
+pub(crate) fn validate_restorable_session_metadata(
+    bytes: &[u8],
+    expected_id: &str,
+) -> Result<(), &'static str> {
+    let first = bytes
+        .split(|byte| *byte == b'\n')
+        .next()
+        .ok_or("Archive session is empty.")?;
+    let first_line =
+        std::str::from_utf8(first).map_err(|_| "Archive session is not UTF-8 JSONL metadata.")?;
+    let summary =
+        parse_session_metadata_line(first_line, &SessionIndex::default()).map_err(|error| {
+            match error {
+                ParseError::Unsupported => {
+                    "Archive session uses an unsupported Codex metadata format."
+                }
+                ParseError::Malformed => "Archive session is not valid Codex metadata.",
+                ParseError::Unreadable => "Archive session metadata is unreadable.",
+            }
+        })?;
     if summary.id != expected_id {
         return Err("Archive session metadata does not match its manifest entry.");
     }
@@ -366,7 +407,8 @@ fn normalize_session_metadata(
         source: record
             .payload
             .source
-            .as_ref().map(SessionSource::label)
+            .as_ref()
+            .map(SessionSource::label)
             .filter(|value| !value.is_empty()),
     })
 }
@@ -377,12 +419,25 @@ mod tests {
 
     #[test]
     fn observed_object_sources_and_unknown_variant() {
-        for source in [r#"{"subagent":{"other":"guardian"}}"#, r#"{"subagent":{"thread_spawn":{"parent_thread_id":"synthetic","depth":1,"agent_path":"/root/test","agent_nickname":"Test","agent_role":null}}}"#] {
-            let line = format!(r#"{{"type":"session_meta","payload":{{"id":"fixture","source":{source}}}}}"#);
-            assert!(parse_session_metadata_line(&line, &SessionIndex::default()).unwrap().source.unwrap().starts_with("subagent:"));
+        for source in [
+            r#"{"subagent":{"other":"guardian"}}"#,
+            r#"{"subagent":{"thread_spawn":{"parent_thread_id":"synthetic","depth":1,"agent_path":"/root/test","agent_nickname":"Test","agent_role":null}}}"#,
+        ] {
+            let line = format!(
+                r#"{{"type":"session_meta","payload":{{"id":"fixture","source":{source}}}}}"#
+            );
+            assert!(parse_session_metadata_line(&line, &SessionIndex::default())
+                .unwrap()
+                .source
+                .unwrap()
+                .starts_with("subagent:"));
             validate_restorable_session_metadata(line.as_bytes(), "fixture").unwrap();
         }
-        assert!(parse_session_metadata_line(r#"{"type":"session_meta","payload":{"id":"fixture","source":{"future":{}}}}"#, &SessionIndex::default()).is_err());
+        assert!(parse_session_metadata_line(
+            r#"{"type":"session_meta","payload":{"id":"fixture","source":{"future":{}}}}"#,
+            &SessionIndex::default()
+        )
+        .is_err());
     }
 
     #[test]
@@ -437,16 +492,25 @@ mod tests {
     #[test]
     fn rejects_unknown_or_invalid_metadata_variants_without_guessing() {
         assert!(matches!(
-            parse_session_metadata_line(r#"{"type":"session_meta_v2","payload":{"session_id":"new"}}"#, &SessionIndex::default()),
+            parse_session_metadata_line(
+                r#"{"type":"session_meta_v2","payload":{"session_id":"new"}}"#,
+                &SessionIndex::default()
+            ),
             Err(ParseError::Unsupported)
         ));
         assert!(matches!(
-            parse_session_metadata_line(r#"{"type":"session_meta","payload":{"session_id":42}}"#, &SessionIndex::default()),
+            parse_session_metadata_line(
+                r#"{"type":"session_meta","payload":{"session_id":42}}"#,
+                &SessionIndex::default()
+            ),
             Err(ParseError::Malformed)
         ));
-        assert!(validate_restorable_session_metadata(b"{\"type\":\"session_meta_v2\",\"payload\":{\"session_id\":\"new\"}}\n", "new")
-            .unwrap_err()
-            .contains("unsupported"));
+        assert!(validate_restorable_session_metadata(
+            b"{\"type\":\"session_meta_v2\",\"payload\":{\"session_id\":\"new\"}}\n",
+            "new"
+        )
+        .unwrap_err()
+        .contains("unsupported"));
     }
 
     #[test]
@@ -502,12 +566,26 @@ mod tests {
 
     #[test]
     fn ignores_symlinked_session_files_and_directories() {
-        let root = std::env::temp_dir().join(format!("codex-companion-symlink-test-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
-        let sessions = root.join("sessions/2026/09/04"); fs::create_dir_all(&sessions).unwrap();
-        let target = root.join("outside.jsonl"); fs::write(&target, r#"{"type":"session_meta","payload":{"session_id":"outside"}}"#).unwrap();
+        let root = std::env::temp_dir().join(format!(
+            "codex-companion-symlink-test-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let sessions = root.join("sessions/2026/09/04");
+        fs::create_dir_all(&sessions).unwrap();
+        let target = root.join("outside.jsonl");
+        fs::write(
+            &target,
+            r#"{"type":"session_meta","payload":{"session_id":"outside"}}"#,
+        )
+        .unwrap();
         let link = sessions.join("linked.jsonl");
-        #[cfg(windows)] let linked = std::os::windows::fs::symlink_file(&target, &link);
-        #[cfg(unix)] let linked = std::os::unix::fs::symlink(&target, &link);
+        #[cfg(windows)]
+        let linked = std::os::windows::fs::symlink_file(&target, &link);
+        #[cfg(unix)]
+        let linked = std::os::unix::fs::symlink(&target, &link);
         if linked.is_ok() {
             let discovery = discover_sessions_in(&root);
             assert!(discovery.conversations.is_empty());

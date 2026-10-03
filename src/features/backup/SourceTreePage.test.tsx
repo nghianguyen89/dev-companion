@@ -2,12 +2,11 @@ import { expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { SourceTreePage } from "./SourceTreePage";
 
-it("shows the explicit SourceTree exclusions and manual-only recovery", () => {
+it("requires an encrypted SourceTree configuration bundle password", () => {
   const html = renderToStaticMarkup(<SourceTreePage />);
   expect(html).toContain("SourceTree");
-  expect(html).toContain("bookmarks.xml");
-  expect(html).toContain("Repositories, tabs, custom actions, user.config, hosted accounts, credential files, license keys, and secrets");
-  expect(html).toContain("trusted encrypted transport");
-  expect(html).toContain("manual only");
-  expect(html).not.toContain("Apply SourceTree settings automatically");
+  expect(html).toContain("configuration");
+  expect(html).toContain("Create encrypted bundle");
+  expect(html).toContain("New bundle password");
+  expect(html).toContain("Windows");
 });

@@ -40,6 +40,40 @@
   bounded result list. Surface a percentage only when 7-Zip emits one through
   `-bsp1`; otherwise retain indeterminate progress.
 
+## 2026-10-03: SourceTree personal configuration bundle
+
+- Replace the bookmark-only SourceTree flow with one concrete, sensitive bundle
+  of `accounts.json`, `bookmarks.xml`, `customactions.xml`, and the current
+  SourceTree `user.config` when each is present as a regular file. Do not read
+  their contents into the UI or logs.
+- Keep Windows Credential Manager, OAuth tokens, SSH keys and SourceTree/Git
+  passwords outside the bundle: they are managed by Windows and may be DPAPI
+  bound to the previous machine. The UI must state that accounts may still need
+  a sign-in after restoration.
+- Require SourceTree to be closed. Preview hashes and counts the exact detected
+  files; create revalidates before making a create-new ZIP. Inspect rejects
+  unknown, missing, duplicate, linked or hash-mismatched entries.
+- Restore only after an explicit `RESTORE` confirmation. Save an internal
+  safety copy of an existing target before replacing it, then rollback newly
+  restored files if a later write fails. Add a separate explicit `DELETE`
+  action for an inspected bundle after a successful restore.
+
+## 2026-10-03: SourceTree full personal migration
+
+- Extend the concrete SourceTree allowlist to include detected `opentabs.xml`,
+  `hostedaccounts.xml`, `userhosts`, and `passwd` alongside the existing
+  configuration files. Treat every file as opaque: return only its name and
+  byte count to the UI and never log its contents.
+- New bundles use a versioned AES-256 encrypted ZIP. Require a user-entered
+  password for create, inspect, recovery preview, and restore; keep it only in
+  the active command call, never in the manifest, plan token, settings, logs,
+  or history. Continue to accept existing version-1 unencrypted bundles so
+  earlier backups remain recoverable.
+- Maintain the closed-SourceTree gate, revalidation, strict inventory/hash
+  checks, direct restore with safety copy/rollback, and explicit `RESTORE` /
+  `DELETE` confirmations. This copies legacy local credential files but cannot
+  migrate Windows Credential Manager, OAuth/DPAPI-bound secrets, or SSH keys.
+
 ## 2026-09-25: File Transfer
 
 - Add one concrete `file_transfer.rs` adapter: pure command construction,

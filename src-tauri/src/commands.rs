@@ -1,7 +1,7 @@
 use crate::{
-    backup, codex, codex_content, codex_environment,
+    backup, codex, codex_content, codex_environment, compression,
     config::{self, AppConfiguration, ConfigurationError},
-    compression, file_transfer, local_delete, session_storage,
+    file_transfer, local_delete, session_storage,
 };
 use tauri_plugin_dialog::DialogExt;
 
@@ -16,23 +16,42 @@ pub async fn scan_compression_source(source: String) -> Result<compression::Sour
 }
 
 #[tauri::command]
-pub async fn pick_compression_folder(app: tauri::AppHandle, title: String) -> Result<Option<String>, String> {
-    run_blocking(move || Ok(app.dialog().file().set_title(title).blocking_pick_folder().and_then(|folder| folder.into_path().ok()).map(|path| compression::display_path(&path)))).await?
+pub async fn pick_compression_folder(
+    app: tauri::AppHandle,
+    title: String,
+) -> Result<Option<String>, String> {
+    run_blocking(move || {
+        Ok(app
+            .dialog()
+            .file()
+            .set_title(title)
+            .blocking_pick_folder()
+            .and_then(|folder| folder.into_path().ok())
+            .map(|path| compression::display_path(&path)))
+    })
+    .await?
 }
 
 #[tauri::command]
-pub async fn preview_compression(config: compression::CompressionConfig) -> Result<compression::CommandPreview, String> {
+pub async fn preview_compression(
+    config: compression::CompressionConfig,
+) -> Result<compression::CommandPreview, String> {
     run_blocking(move || compression::preview(&config)).await?
 }
 
 #[tauri::command]
-pub async fn start_compression(app: tauri::AppHandle, config: compression::CompressionConfig) -> Result<compression::Started, String> {
+pub async fn start_compression(
+    app: tauri::AppHandle,
+    config: compression::CompressionConfig,
+) -> Result<compression::Started, String> {
     run_blocking(move || compression::start(app, config)).await?
 }
 
 #[tauri::command]
 pub async fn cancel_compression() -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(compression::cancel).await.map_err(|_| "Cancellation did not complete.")?
+    tauri::async_runtime::spawn_blocking(compression::cancel)
+        .await
+        .map_err(|_| "Cancellation did not complete.")?
 }
 
 #[tauri::command]
@@ -251,6 +270,68 @@ pub async fn recover_sourcetree(
 ) -> Result<crate::sourcetree::RecoveryResult, String> {
     run_blocking(move || crate::sourcetree::recover(&token, &confirmation)).await?
 }
+#[tauri::command]
+pub async fn preview_sourcetree_config() -> Result<crate::sourcetree_config::Preview, String> {
+    run_blocking(crate::sourcetree_config::preview).await?
+}
+#[tauri::command]
+pub async fn create_sourcetree_config_bundle(
+    token: String,
+    password: String,
+) -> Result<crate::sourcetree_config::Created, String> {
+    run_blocking(move || crate::sourcetree_config::create(&token, &password)).await?
+}
+#[tauri::command]
+pub async fn open_sourcetree_config_bundle_folder() -> Result<(), String> {
+    run_blocking(crate::sourcetree_config::open_bundle_folder).await?
+}
+#[tauri::command]
+pub async fn inspect_sourcetree_config_bundle(
+    app: tauri::AppHandle,
+    password: String,
+) -> Result<Option<crate::sourcetree_config::Inspection>, String> {
+    run_blocking(move || {
+        let Some(file) = app
+            .dialog()
+            .file()
+            .set_title("Choose a complete SourceTree configuration bundle")
+            .add_filter("SourceTree configuration bundle", &["zip"])
+            .blocking_pick_file()
+        else {
+            return Ok(None);
+        };
+        crate::sourcetree_config::inspect(
+            file.into_path()
+                .map_err(|_| "The selected bundle does not have a readable local path.")?,
+            &password,
+        )
+        .map(Some)
+    })
+    .await?
+}
+#[tauri::command]
+pub async fn preview_sourcetree_config_recovery(
+    token: String,
+    password: String,
+) -> Result<crate::sourcetree_config::RecoveryPreview, String> {
+    run_blocking(move || crate::sourcetree_config::preview_recovery(&token, &password)).await?
+}
+#[tauri::command]
+pub async fn recover_sourcetree_config(
+    token: String,
+    confirmation: String,
+    password: String,
+) -> Result<crate::sourcetree_config::RecoveryResult, String> {
+    run_blocking(move || crate::sourcetree_config::recover(&token, &confirmation, &password))
+        .await?
+}
+#[tauri::command]
+pub async fn delete_sourcetree_config_bundle(
+    token: String,
+    confirmation: String,
+) -> Result<(), String> {
+    run_blocking(move || crate::sourcetree_config::delete(&token, &confirmation)).await?
+}
 
 #[tauri::command]
 pub async fn get_xampp_readiness() -> Result<crate::xampp::Readiness, String> {
@@ -447,16 +528,29 @@ pub async fn get_file_transfer_readiness() -> Result<file_transfer::Readiness, S
     run_blocking(file_transfer::readiness).await
 }
 #[tauri::command]
-pub async fn list_file_transfer_directory(path: String) -> Result<file_transfer::DirectoryListing, String> {
+pub async fn list_file_transfer_directory(
+    path: String,
+) -> Result<file_transfer::DirectoryListing, String> {
     run_blocking(move || file_transfer::list_directory(path)).await?
 }
 #[tauri::command]
-pub async fn preview_file_transfer(config: file_transfer::TransferConfig) -> Result<file_transfer::CommandPreview, String> {
+pub async fn preview_file_transfer(
+    config: file_transfer::TransferConfig,
+) -> Result<file_transfer::CommandPreview, String> {
     run_blocking(move || file_transfer::preview(&config)).await?
 }
 #[tauri::command]
-pub async fn pick_file_transfer_folder(app: tauri::AppHandle, title: String) -> Result<Option<String>, String> {
-    Ok(app.dialog().file().set_title(title).blocking_pick_folder().and_then(|folder| folder.into_path().ok()).map(|path| path.display().to_string()))
+pub async fn pick_file_transfer_folder(
+    app: tauri::AppHandle,
+    title: String,
+) -> Result<Option<String>, String> {
+    Ok(app
+        .dialog()
+        .file()
+        .set_title(title)
+        .blocking_pick_folder()
+        .and_then(|folder| folder.into_path().ok())
+        .map(|path| path.display().to_string()))
 }
 #[tauri::command]
 pub async fn start_file_transfer(
@@ -469,19 +563,42 @@ pub async fn start_file_transfer(
 }
 #[tauri::command]
 pub async fn cancel_file_transfer() -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(file_transfer::cancel).await.map_err(|_| "The cancellation did not complete.")?
+    tauri::async_runtime::spawn_blocking(file_transfer::cancel)
+        .await
+        .map_err(|_| "The cancellation did not complete.")?
 }
 #[tauri::command]
-pub async fn get_file_transfer_history() -> Result<Vec<file_transfer::TransferHistoryEntry>, String> {
-    run_blocking(|| { let configuration = config::load().map_err(configuration_error)?; file_transfer::list_history(&configuration) }).await?
+pub async fn get_file_transfer_history() -> Result<Vec<file_transfer::TransferHistoryEntry>, String>
+{
+    run_blocking(|| {
+        let configuration = config::load().map_err(configuration_error)?;
+        file_transfer::list_history(&configuration)
+    })
+    .await?
 }
 #[tauri::command]
 pub async fn open_file_transfer_log(path: String) -> Result<(), String> {
-    run_blocking(move || { let configuration = config::load().map_err(configuration_error)?; file_transfer::open_log(&configuration, &path) }).await?
+    run_blocking(move || {
+        let configuration = config::load().map_err(configuration_error)?;
+        file_transfer::open_log(&configuration, &path)
+    })
+    .await?
+}
+#[tauri::command]
+pub async fn delete_file_transfer_log(id: String) -> Result<(), String> {
+    run_blocking(move || {
+        let configuration = config::load().map_err(configuration_error)?;
+        file_transfer::delete_log(&configuration, &id)
+    })
+    .await?
 }
 #[tauri::command]
 pub async fn open_file_transfer_logs_folder() -> Result<(), String> {
-    run_blocking(|| { let configuration = config::load().map_err(configuration_error)?; file_transfer::open_logs_folder(&configuration) }).await?
+    run_blocking(|| {
+        let configuration = config::load().map_err(configuration_error)?;
+        file_transfer::open_logs_folder(&configuration)
+    })
+    .await?
 }
 
 fn configuration_error(error: ConfigurationError) -> String {
@@ -493,6 +610,14 @@ pub async fn get_diagnostics() -> Result<codex::DiagnosticsSnapshot, String> {
     run_blocking(|| {
         let configuration = config::load().map_err(configuration_error)?;
         Ok(codex::diagnostics(&configuration))
+    })
+    .await?
+}
+#[tauri::command]
+pub async fn get_backup_storage() -> Result<codex::BackupStorageOverview, String> {
+    run_blocking(|| {
+        let configuration = config::load().map_err(configuration_error)?;
+        Ok(codex::backup_storage(&configuration))
     })
     .await?
 }

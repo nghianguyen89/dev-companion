@@ -18,6 +18,9 @@ export interface DiagnosticsSnapshot {
   skillsCount: number;
   petsCount: number;
 }
+export interface BackupStorageEntry { name: string; bytes: number; modifiedAt: number | null; }
+export interface BackupStorageSummary { directory: string; fileCount: number; totalBytes: number; recentFiles: BackupStorageEntry[]; }
+export interface BackupStorageOverview { sessionBackups: BackupStorageSummary; personalBundles: BackupStorageSummary; }
 
 export interface CodexSkill { id: string; manifestBytes: number; }
 export interface CodexSkillsOverview { directory: string; skills: CodexSkill[]; skipped: number; }
@@ -183,6 +186,11 @@ export interface SourceTreeReadiness { supported: boolean; bookmarksFound: boole
 export interface SourceTreePreview { token: string; sourceAppVersion: string; bookmarkCount: number; repositoryPaths: string[]; bytes: number; sensitive: boolean; }
 export interface SourceTreeInspection { token: string; bundleName: string; createdAt: string; sourceAppVersion: string; bookmarkCount: number; bytes: number; sensitive: boolean; }
 export interface SourceTreeRecoveryPreview { token: string; stagingPath: string; destinationPath: string; destinationConflict: boolean; manualOnly: boolean; }
+export interface SourceTreeConfigFile { name: string; bytes: number; }
+export interface SourceTreeConfigPreview { token: string; files: SourceTreeConfigFile[]; missing: string[]; bytes: number; sensitive: boolean; }
+export interface SourceTreeConfigInspection { token: string; bundleName: string; files: SourceTreeConfigFile[]; bytes: number; sensitive: boolean; }
+export interface SourceTreeConfigRecoveryPreview { token: string; files: SourceTreeConfigFile[]; existingTargets: number; }
+export interface SourceTreeConfigRecoveryResult { restored: number; safetyCopyPath: string; }
 export interface XamppReadiness { supported: boolean; installationFound: boolean; stopped: boolean; }
 export interface XamppPreview { token: string; sourceAppVersion: string; architecture: string; projects: string[]; configFiles: string[]; fileCount: number; bytes: number; excludedCount: number; sensitive: boolean; }
 export interface XamppInspection { token: string; bundleName: string; createdAt: string; sourceAppVersion: string; architecture: string; projects: string[]; fileCount: number; bytes: number; sensitive: boolean; }

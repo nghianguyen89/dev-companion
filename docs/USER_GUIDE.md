@@ -3,10 +3,18 @@
 **Chưa hoàn tất migration chat sử dụng được trong Codex Desktop.** Bản này có backup môi trường và phục hồi file không ghi đè. Chưa gộp database/index, chưa kiểm chứng chat xuất hiện và mở lại trên máy đích. Không dùng kết quả “đã phục hồi file” làm bằng chứng migration thành công.
 
 Dev Companion hiện hỗ trợ các workflow Windows cụ thể: archive môi trường Codex,
-bundle `.bcpkg` do Beyond Compare xuất, `bookmarks.xml` không chứa secret của
-SourceTree, và project/config được chọn của XAMPP. Bundle cá nhân luôn được coi
+bundle `.bcpkg` do Beyond Compare xuất, bookmark/cấu hình cục bộ SourceTree,
+và project/config được chọn của XAMPP. Bundle cá nhân luôn được coi
 là dữ liệu nhạy cảm; phục hồi chỉ đưa file vào staging của Companion để bạn tự
 đặt hoặc import.
+
+## Bảng điều khiển
+
+**Bảng điều khiển** nằm đầu thanh bên. Trang này hiển thị số lượng môi trường,
+kỹ năng, thú cưng, các nhóm chức năng, và inventory chỉ đọc của hai thư mục
+backup. Tổng số file/dung lượng tính trên toàn bộ file trực tiếp; danh sách chỉ
+hiện tối đa 8 file mới nhất mỗi thư mục. Nút **Làm mới** đọc lại metadata tên,
+dung lượng và thời gian sửa của file, không mở hay sửa nội dung bundle.
 
 ## File Transfer (Robocopy)
 
@@ -52,8 +60,19 @@ profiles được lưu cùng settings cục bộ.
 ## Bundle cá nhân
 
 - **Beyond Compare:** chọn file `.bcpkg` do `Tools > Export Settings` tạo. Companion giữ nguyên package, không chuyển license và không import tự động.
-- **SourceTree:** chỉ đọc schema `bookmarks.xml` đã được kiểm chứng; phải đóng SourceTree. Repository, account, credential và license không được đưa vào bundle.
+- **SourceTree bookmark:** luồng tương thích chỉ đọc schema `bookmarks.xml` đã được kiểm chứng; phải đóng SourceTree. Repository, account, credential và license không được đưa vào bundle.
+- **SourceTree cấu hình cá nhân:** đóng SourceTree, mở trang **SourceTree**, nhập mật khẩu bundle tối thiểu 12 ký tự rồi chọn tạo bundle. Bundle AES-256 có thể gồm các file cục bộ phát hiện được: `accounts.json`, `bookmarks.xml`, `customactions.xml`, `hostedaccounts.xml`, `opentabs.xml`, `passwd`, `userhosts` và `user.config`. Khi phục hồi, chọn bundle, nhập mật khẩu, xem trước, nhập `RESTORE`; file đích có bản sao an toàn trước khi thay thế. Windows Credential Manager, OAuth/DPAPI và SSH key không nằm trong bundle nên có thể vẫn phải đăng nhập lại.
 - **XAMPP:** chọn project trực tiếp dưới `htdocs` cùng bốn file cấu hình đã duyệt. Phải dừng Apache, MariaDB và process liên quan; binary, thư mục dữ liệu MariaDB, secret và log bị loại. Placement và import MariaDB vẫn thủ công.
+
+## Kỹ năng, thú cưng và nén tệp
+
+- **Kỹ năng:** chỉ đọc metadata `SKILL.md`; nhập/xuất luôn tạo thư mục mới và
+  không ghi đè. Nội dung kỹ năng không hiện trong ứng dụng.
+- **Thú cưng:** chỉ nhận pet v2 hợp lệ kèm sprite PNG/WebP; cài đặt tạo thư mục
+  mới, gỡ yêu cầu nhập `REMOVE`.
+- **Nén tệp:** cần 7-Zip cục bộ. Chọn thư mục nguồn, xem cây file chỉ đọc, đặt
+  exclusion rồi chọn Fast hoặc Strong. Tiến độ chỉ hiện phần trăm khi 7-Zip báo
+  dữ liệu đáng tin cậy; có thể Cancel, không ghi đè archive đã tồn tại.
 
 ## Phục hồi vào máy đã có dữ liệu
 
@@ -81,4 +100,9 @@ File đổi nội dung/mtime, liên kết/junction, không rõ schema hoặc đa
 
 ## Portable
 
-Chạy `release/portable/dev-companion.exe`; giữ `portable-mode` cạnh exe. Settings luôn đọc/ghi tại `config/settings.json` cạnh exe khi marker tồn tại. Cờ portable trong Settings điều khiển vị trí backup/quarantine/history theo cấu hình hiện có. Không cần chạy quyền Administrator.
+Chạy `release/portable/dev-companion.exe`; giữ toàn bộ thư mục cùng
+`portable-mode` cạnh exe. Khi bật Portable trong Settings, Companion dùng
+`config/`, `backups/` và `quarantine/` cạnh exe cho settings, backup phiên và
+safety data. Riêng bundle ứng dụng cá nhân luôn ghi vào `backup/` khi marker
+tồn tại, để copy cả thư mục portable là mang theo bundle. Không cần chạy quyền
+Administrator.

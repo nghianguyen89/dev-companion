@@ -35,7 +35,9 @@ pub enum HistoryAction {
 }
 
 impl Default for HistoryAction {
-    fn default() -> Self { Self::Restore }
+    fn default() -> Self {
+        Self::Restore
+    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -65,8 +67,16 @@ pub fn record(
     error_code: Option<String>,
 ) -> Result<(), String> {
     record_operation(
-        configuration, HistoryAction::Restore, archive_name, session_ids, 0, restored_count,
-        skipped_conflicts, safety_backup_path, outcome, error_code,
+        configuration,
+        HistoryAction::Restore,
+        archive_name,
+        session_ids,
+        0,
+        restored_count,
+        skipped_conflicts,
+        safety_backup_path,
+        outcome,
+        error_code,
     )
 }
 
@@ -81,8 +91,16 @@ pub fn record_delete(
     error_code: Option<String>,
 ) -> Result<(), String> {
     record_operation(
-        configuration, HistoryAction::Delete, "Local delete safety archive".into(), session_ids,
-        deleted_count, restored_count, skipped_count, safety_backup_path, outcome, error_code,
+        configuration,
+        HistoryAction::Delete,
+        "Local delete safety archive".into(),
+        session_ids,
+        deleted_count,
+        restored_count,
+        skipped_count,
+        safety_backup_path,
+        outcome,
+        error_code,
     )
 }
 
@@ -164,27 +182,28 @@ fn read_entries(path: &Path) -> Result<Vec<RestoreHistoryEntry>, String> {
     if !path.exists() {
         return Ok(Vec::new());
     }
-    let metadata = fs::symlink_metadata(path)
-        .map_err(|_| "Restore history is unavailable.")?;
+    let metadata = fs::symlink_metadata(path).map_err(|_| "Restore history is unavailable.")?;
     if metadata.file_type().is_symlink() || !metadata.is_file() {
         return Err("Restore history is unavailable.".into());
     }
-    let history: RestoreHistoryFile = serde_json::from_slice(
-        &fs::read(path).map_err(|_| "Restore history is unavailable.")?,
-    )
-    .map_err(|_| "Restore history is unavailable.")?;
+    let history: RestoreHistoryFile =
+        serde_json::from_slice(&fs::read(path).map_err(|_| "Restore history is unavailable.")?)
+            .map_err(|_| "Restore history is unavailable.")?;
     if history.format_version != HISTORY_FORMAT_VERSION {
         return Err("Restore history uses an unsupported format.".into());
     }
-    Ok(history.entries.into_iter().take(MAX_HISTORY_ENTRIES).collect())
+    Ok(history
+        .entries
+        .into_iter()
+        .take(MAX_HISTORY_ENTRIES)
+        .collect())
 }
 
 fn write_entries(path: &Path, entries: &[RestoreHistoryEntry]) -> Result<(), String> {
     let parent = path.parent().ok_or("Restore history is unavailable.")?;
     fs::create_dir_all(parent).map_err(|_| "Restore history is unavailable.")?;
     if path.exists() {
-        let metadata = fs::symlink_metadata(path)
-            .map_err(|_| "Restore history is unavailable.")?;
+        let metadata = fs::symlink_metadata(path).map_err(|_| "Restore history is unavailable.")?;
         if metadata.file_type().is_symlink() || !metadata.is_file() {
             return Err("Restore history is unavailable.".into());
         }
@@ -193,8 +212,11 @@ fn write_entries(path: &Path, entries: &[RestoreHistoryEntry]) -> Result<(), Str
         format_version: HISTORY_FORMAT_VERSION,
         entries: entries.to_vec(),
     };
-    fs::write(path, serde_json::to_vec_pretty(&document).map_err(|_| "Restore history is unavailable.")?)
-        .map_err(|_| "Restore history is unavailable.".to_owned())
+    fs::write(
+        path,
+        serde_json::to_vec_pretty(&document).map_err(|_| "Restore history is unavailable.")?,
+    )
+    .map_err(|_| "Restore history is unavailable.".to_owned())
 }
 
 #[cfg(test)]
@@ -205,7 +227,10 @@ mod tests {
     fn history_keeps_a_bounded_sanitized_audit_summary() {
         let root = std::env::temp_dir().join(format!(
             "codex-companion-history-test-{}",
-            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
         ));
         fs::create_dir_all(&root).unwrap();
         let path = root.join("history.json");
@@ -221,12 +246,16 @@ mod tests {
                 None,
                 RestoreOutcome::Completed,
                 None,
-            ).unwrap();
+            )
+            .unwrap();
         }
         let loaded = read_entries(&path).unwrap();
         assert_eq!(loaded.len(), MAX_HISTORY_ENTRIES);
         assert_eq!(loaded[0].archive_name, "archive-100.zip");
-        assert_eq!(safe_archive_name("C:/private/source/archive.zip"), "archive.zip");
+        assert_eq!(
+            safe_archive_name("C:/private/source/archive.zip"),
+            "archive.zip"
+        );
         let serialized = fs::read_to_string(&path).unwrap();
         assert!(!serialized.contains("C:/private/source"));
         assert!(serialized.contains("session-100"));
@@ -237,7 +266,10 @@ mod tests {
     fn corrupt_or_future_history_is_not_silently_interpreted() {
         let path = std::env::temp_dir().join(format!(
             "codex-companion-history-invalid-{}.json",
-            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
         ));
         fs::write(&path, r#"{"formatVersion":2,"entries":[]}"#).unwrap();
         assert!(read_entries(&path).unwrap_err().contains("unsupported"));

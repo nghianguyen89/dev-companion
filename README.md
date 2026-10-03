@@ -1,6 +1,6 @@
 # Dev Companion
 
-Dev Companion is a Windows-only local developer-tool utility for selected migration data and Codex environment management: Codex environment files, isolated local Codex environments, Beyond Compare settings packages, SourceTree bookmarks, and XAMPP projects/configuration. It is an independent community utility, not an official OpenAI product.
+Dev Companion is a Windows-only local developer-tool utility for selected migration data and Codex environment management: Codex environment files, isolated local Codex environments, Beyond Compare settings packages, SourceTree configuration/bookmarks, and XAMPP projects/configuration. It is an independent community utility, not an official OpenAI product.
 
 File Transfer is a local Robocopy GUI for explicit folder transfers. It supports Simple Copy, Fast Copy, Project Migration, and confirmation-protected Mirror operations with direct process launch, live output, logs, profiles, and local history.
 
@@ -12,9 +12,30 @@ Codex environment archives cover selected local files with SHA-256 verification,
 
 Temporary cleanup is on-demand and limited to the verified remote plugin catalog cache. Installed plugin resources are protected. Session v1 and existing delete safety archives remain readable.
 
-Personal bundles are concrete Windows-only workflows: an opaque user-exported Beyond Compare `.bcpkg`, fixture-proven non-secret SourceTree `bookmarks.xml`, and explicitly selected XAMPP `htdocs` projects plus reviewed text configuration. Recovery stages files for manual placement or import and never overwrites existing data.
+Personal bundles are concrete Windows-only workflows: an opaque user-exported Beyond Compare `.bcpkg`, SourceTree bookmarks and an optional AES-256 encrypted full local-configuration bundle, and explicitly selected XAMPP `htdocs` projects plus reviewed text configuration. Recovery stages files for manual placement or import and never overwrites existing data.
 
-See [User guide](docs/USER_GUIDE.md), [storage inventory and limitations](docs/STORAGE_AUDIT.md), [build instructions](BUILD.md), and [validation](docs/VALIDATION.md).
+See [User guide](docs/USER_GUIDE.md), [storage inventory and limitations](docs/STORAGE_AUDIT.md), [build instructions](BUILD.md), [development and debugging](docs/DEVELOPMENT.md), [debug notes](docs/DEBUG_NOTES.md), and [validation](docs/VALIDATION.md).
+
+## Quick start
+
+For a built portable copy, keep the full `release/portable` folder together and
+run `dev-companion.exe`. Keep `portable-mode` beside the executable. Personal
+application bundles are stored in its adjacent `backup/` folder, so they travel
+with the portable folder. The Dashboard is the first navigation item and shows
+the current feature summary plus a read-only inventory of `backup/` and
+`backups/`.
+
+To develop locally on Windows, install Node.js, pnpm, Rust stable, Visual
+Studio C++ Build Tools, and WebView2, then run:
+
+```powershell
+pnpm install
+pnpm tauri dev
+```
+
+For a portable executable and NSIS installer, close any running portable copy
+and run `./build-publish.ps1`. Full commands and troubleshooting are in
+[BUILD.md](BUILD.md) and [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## Supported platforms
 

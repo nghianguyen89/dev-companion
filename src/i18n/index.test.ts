@@ -5,6 +5,10 @@ import type { AppConfiguration } from "../types/codex";
 describe("i18n", () => {
   it("defaults to English", () => expect(translate(undefined, "settings.language")).toBe("Language"));
   it("switches to Vietnamese", () => expect(translate("vi", "nav.settings")).toBe("Cài đặt"));
+  it("localizes active transfer and compression controls", () => {
+    expect(translate("vi", "fileTransfer.robocopyReady")).toBe("Robocopy sẵn sàng");
+    expect(translate("vi", "compression.createArchive")).toBe("Tạo kho lưu trữ");
+  });
   it("uses the language persisted in AppConfiguration", () => {
     const configuration: AppConfiguration = { theme: "system", portableMode: false, createSafetyBackups: true, language: "vi", logLevel: "warn", codexEnvironments: [], fileTransferProfiles: [] };
     expect(translate(configuration.language, "settings.language")).toBe("Ngôn ngữ");

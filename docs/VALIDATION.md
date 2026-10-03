@@ -1,5 +1,13 @@
 # Validation — 2026-09-07
 
+## Current working-tree validation — 2026-10-04
+
+The current feature set passed `pnpm lint`, `pnpm check`, `pnpm test` (28
+tests), `pnpm build`, `cargo check --manifest-path src-tauri/Cargo.toml`, the
+focused backup-inventory Rust test, and `git diff --check`. The full Rust
+library suite had 92 passing tests and one pre-existing environment-dependent
+failure in `codex_environment::tests::metadata_crud_and_removal_leave_codex_home_in_place` because the test process could not resolve the current Windows home directory. The native portable EXE/NSIS build and a packaged-app smoke test have not been rerun after the latest SourceTree, portable-storage, theme, and Dashboard changes.
+
 ## Automated checks
 
 All commands ran successfully in `D:\projects\my-github\tools\codex-companion` after the final source changes:

@@ -1,0 +1,28 @@
+.app-shell[data-theme="dark"] { color-scheme: dark; }
+.app-shell[data-theme="light"] { color-scheme: light; color: #1c2735; background: #f4f7fb; }
+.app-shell[data-theme="light"] .sidebar { background: #fff; border-color: #d9e1eb; }
+.app-shell[data-theme="light"] .brand span:last-child, .app-shell[data-theme="light"] .sidebar nav p, .app-shell[data-theme="light"] .sidebar footer { color: #64748b; }
+.app-shell[data-theme="light"] .sidebar nav button { color: #334155; }
+.app-shell[data-theme="light"] .nav-icon { color: #55708f; }
+.app-shell[data-theme="light"] .sidebar nav button:hover { background: #eaf1f8; color: #102a43; }
+.app-shell[data-theme="light"] .sidebar nav button.active { color: #102a43; background: #dbeafe; }
+.app-shell[data-theme="light"] :is(.summary-card, .notice-card, .empty-feature, .diagnostics-list, .settings-form, .conversation-table-wrap, .backup-selection, .backup-preview, .success-card, .archive-inspection, .inspection-result, .restore-history, .file-transfer-explorer > div, .file-transfer-card, .codex-environment-card, .dashboard-section, .dashboard-feature-grid article, .dashboard-backup-card) { background: #fff; border-color: #d9e1eb; }
+.app-shell[data-theme="light"] :is(.page-header p, .summary-card span, .notice-card p, .empty-feature p, .backup-selection p, .backup-preview p, .success-card p, .archive-inspection p, .inspection-result > p, .restore-history-heading p, .history-state, .file-transfer-card p, .file-transfer-explorer header span, .file-transfer-explorer p, .compression-tree label small, .compression-tree-summary, .compression-working, .dashboard-section > p, .dashboard-feature-grid p, .dashboard-backup-card > p, .dashboard-backup-card li span) { color: #52667d; }
+.app-shell[data-theme="light"] :is(.settings-form label, .conversation-controls label, .codex-environment-form label, .file-transfer-path label, .file-transfer-advanced > label, .file-transfer-tags) { color: #334155; }
+.app-shell[data-theme="light"] :is(.settings-form select, .conversation-controls input, .conversation-controls select, .file-transfer-path input, .file-transfer-advanced input, .file-transfer-advanced select, .file-transfer-tags input, .compression-tree-filter input, .compression-patterns textarea, .delete-confirmation input, .codex-environment-form input, .codex-environment-card textarea, .file-transfer-command, .file-transfer-output) { color: #1c2735; background: #fff; border-color: #b9c7d6; }
+.app-shell[data-theme="light"] :is(.conversation-table-wrap, .conversation-table th, .conversation-table td, .file-transfer-explorer ul, .file-transfer-explorer li, .next-step) { border-color: #d9e1eb; }
+.app-shell[data-theme="light"] .conversation-table th, .app-shell[data-theme="light"] :is(.conversation-table td, .conversation-table td strong, .conversation-table td code, .backup-preview dt, .backup-preview dd, .inspection-result dt, .inspection-result dd, .file-transfer-card code, .file-transfer-summary dt) { color: #40556c; }
+.app-shell[data-theme="light"] :is(.page-header button, .settings-form button, .backup-selection button, .backup-preview button, .archive-inspection button, .restore-history-heading button, .codex-environment-heading button, .codex-environment-actions button, .codex-environment-card > p button, .file-transfer-explorer header > button, .file-transfer-actions button, .file-transfer-tags button, .conversation-table button, .compression-folder button, .compression-page .file-transfer-actions button, .compression-show-more) { border-color: #28619a; color: #fff; background: #28619a; }
+.app-shell[data-theme="light"] .file-transfer-entry-name, .app-shell[data-theme="light"] .file-transfer-breadcrumbs button { color: #1f5f99; }
+.app-shell[data-theme="light"] .file-transfer-tags span { background: #e6eef7; }
+.app-shell[data-theme="light"] .file-transfer-card fieldset, .app-shell[data-theme="light"] .compression-tree { border-color: #b9c7d6; }
+.app-shell[data-theme="light"] .diagnostics-list div { border-color: #d9e1eb; }
+.app-shell[data-theme="light"] .diagnostics-list span { color: #52667d; }
+.app-shell[data-theme="light"] .diagnostics-list code { color: #1c2735; }
+.app-shell[data-theme="light"] .dashboard-backup-card > code { color: #1f5f99; }
+.app-shell[data-theme="light"] .success-card { background: #edf9f0; border-color: #77b98a; }
+.app-shell[data-theme="light"] .partial-card { background: #fff8e6; border-color: #d4ae56; }
+.app-shell[data-theme="light"] :is(.error-banner, .error-card, .delete-selection, .delete-preview) { background: #fff1f1; border-color: #d58b8b; color: #8b2626; }
+.cleanup-selection { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 12px; border: 1px solid #3b4659; border-radius: 7px; cursor: pointer; }
+.cleanup-selection span { display: grid; gap: 4px; }.cleanup-selection small { color: #aeb8ca; }
+.app-shell[data-theme="light"] .cleanup-selection { border-color: #b9c7d6; }.app-shell[data-theme="light"] .cleanup-selection small { color: #52667d; }
