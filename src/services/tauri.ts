@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AppConfiguration, ArchiveInspection, BackupPreview, BackupResult, BeyondCompareBundleInspection, BeyondCompareBundlePreview, BeyondCompareReadiness, BeyondCompareRecoveryPreview, CodexEnvironmentActionResult, CodexEnvironmentInput, CodexEnvironmentInstructions, CodexEnvironmentOverview, CodexPaths, ConversationDiscovery, DeletePreview, DeleteResult, DiagnosticsSnapshot, FileTransferCommandPreview, FileTransferConfig, FileTransferDirectoryListing, FileTransferHistoryEntry, FileTransferReadiness, RestoreHistoryEntry, RestorePreview, RestoreResult, SourceTreeInspection, SourceTreePreview, SourceTreeReadiness, SourceTreeRecoveryPreview, XamppInspection, XamppPreview, XamppReadiness, XamppRecoveryPreview } from "../types/codex";
+import type { AppConfiguration, ArchiveInspection, BackupPreview, BackupResult, BeyondCompareBundleInspection, BeyondCompareBundlePreview, BeyondCompareReadiness, BeyondCompareRecoveryPreview, CodexEnvironmentActionResult, CodexEnvironmentInput, CodexEnvironmentInstructions, CodexEnvironmentOverview, CodexPaths, CompressionCommandPreview, CompressionConfig, CompressionReadiness, CompressionSourceTree, ConversationDiscovery, DeletePreview, DeleteResult, DiagnosticsSnapshot, FileTransferCommandPreview, FileTransferConfig, FileTransferDirectoryListing, FileTransferHistoryEntry, FileTransferReadiness, RestoreHistoryEntry, RestorePreview, RestoreResult, SourceTreeInspection, SourceTreePreview, SourceTreeReadiness, SourceTreeRecoveryPreview, XamppInspection, XamppPreview, XamppReadiness, XamppRecoveryPreview } from "../types/codex";
 
 export const getDiagnostics = (): Promise<DiagnosticsSnapshot> => invoke("get_diagnostics");
 export const getPaths = (): Promise<CodexPaths> => invoke("get_codex_paths");
@@ -54,3 +54,9 @@ export const cancelFileTransfer = (): Promise<void> => invoke("cancel_file_trans
 export const getFileTransferHistory = (): Promise<FileTransferHistoryEntry[]> => invoke("get_file_transfer_history");
 export const openFileTransferLog = (path: string): Promise<void> => invoke("open_file_transfer_log", { path });
 export const openFileTransferLogsFolder = (): Promise<void> => invoke("open_file_transfer_logs_folder");
+export const getCompressionReadiness = (): Promise<CompressionReadiness> => invoke("get_compression_readiness");
+export const scanCompressionSource = (source: string): Promise<CompressionSourceTree> => invoke("scan_compression_source", { source });
+export const pickCompressionFolder = (title: string): Promise<string | null> => invoke("pick_compression_folder", { title });
+export const previewCompression = (config: CompressionConfig): Promise<CompressionCommandPreview> => invoke("preview_compression", { config });
+export const startCompression = (config: CompressionConfig): Promise<{ state: string }> => invoke("start_compression", { config });
+export const cancelCompression = (): Promise<void> => invoke("cancel_compression");

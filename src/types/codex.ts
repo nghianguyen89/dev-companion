@@ -48,6 +48,14 @@ export interface FileTransferProgress { bytesCopied: number; totalBytes: number;
 export interface FileTransferSummary { filesCopied: number | null; filesSkipped: number | null; filesFailed: number | null; bytesCopied: number | null; }
 export interface FileTransferCompletion { phase: "analysis" | "transfer"; state: "completed" | "completed-with-warning" | "failed"; exitCode: number | null; interpretation: { status: "success" | "warning" | "error"; message: string }; summary: FileTransferSummary; durationSeconds: number; logPath: string | null; verification: "Verified" | "Differences found" | "Verification failed" | null; }
 export interface FileTransferHistoryEntry { id: string; startedAt: string; completedAt: string; source: string; destination: string; preset: FileTransferMode; status: string; bytesCopied: number | null; filesCopied: number | null; durationSeconds: number; exitCode: number | null; logPath: string | null; }
+export interface CompressionReadiness { available: boolean; path: string | null; message: string; running: boolean; }
+export interface CompressionTreeEntry { path: string; isDirectory: boolean; bytes: number; }
+export interface CompressionSourceTree { source: string; defaultOutputFolder: string; entries: CompressionTreeEntry[]; skippedReparsePoints: number; }
+export interface CompressionConfig { source: string; outputFolder: string; mode: "fast" | "strong"; excludedPaths: string[]; regexExclusions: string[]; }
+export interface CompressionCommandPreview { command: string; archivePath: string; includedFiles: number; includedFolders: number; skippedReparsePoints: number; }
+export interface CompressionOutput { line: string; stream: "stdout" | "stderr"; }
+export interface CompressionProgress { percent: number; }
+export interface CompressionCompletion { state: "completed" | "failed" | "cancelled"; archivePath: string | null; exitCode: number | null; message: string; }
 
 export interface CodexEnvironment {
   id: string;

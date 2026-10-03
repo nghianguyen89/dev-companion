@@ -28,6 +28,11 @@ Release/version: 0.2.0
   streamed output, cancellation, logs/history, profiles and optional
   non-destructive destination verification. Start analyzes first; determinate
   progress requires both the dry-run byte total and guarded English completed-file output.
+- File Compression: independent 7-Zip CLI `.7z` creation with a recursive,
+  read-only source tree, path and regex exclusions, Fast (`-mx=1`) / Strong
+  (`-mx=9`) modes, source-parent output by default, direct output streaming,
+  truthful 7-Zip percentage progress, bounded/filterable tree rendering,
+  cancellation, reparse-point exclusion, and no-overwrite publication.
 
 ### Phase 0–1 addition
 
@@ -92,6 +97,11 @@ Type-check: pnpm check (pass, 2026-09-09)
 Tests: pnpm test (18 pass); cargo test --lib (60 pass, 2026-09-09)
 Build: pnpm build (pass); Windows x64 NSIS bundle and portable executable (pass, 2026-09-09); MSI not run
 ```
+
+2026-10-03 File Compression: `pnpm check`, `pnpm lint`, `pnpm test` (21),
+`cargo check`, and 8 focused compression tests (including a local 7-Zip smoke
+archive) passed. The full Rust library run had 80 passing tests and one
+pre-existing environment-dependent failure resolving the current user home.
 
 Never mark validation as passing unless it was actually run.
 

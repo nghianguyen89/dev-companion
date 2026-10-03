@@ -1,6 +1,7 @@
 import { EnvironmentPage } from "../features/backup/EnvironmentPage";
 import { CodexEnvironmentsPage } from "../features/codex-environments/CodexEnvironmentsPage";
 import { FileTransferPageUx as FileTransferPage } from "../features/file-transfer/FileTransferPageUx";
+import { CompressionPage } from "../features/compression/CompressionPage";
 import { CleanupPage } from "../features/cleanup/CleanupPage";
 import { useCallback, useState } from "react";
 import { BackupPage } from "../features/backup/BackupPage";
@@ -18,9 +19,10 @@ import { getConfiguration, getDiagnostics, saveConfiguration } from "../services
 import type { AppConfiguration } from "../types/codex";
 import { I18nProvider, translate, type TranslationKey } from "../i18n";
 
-type Page = "fileTransfer" | "codexAccounts" | "environment" | "beyondCompare" | "sourceTree" | "xampp" | "cleanup" | "dashboard" | "conversations" | "backup" | "skills" | "pets" | "diagnostics" | "settings";
+type Page = "fileTransfer" | "compression" | "codexAccounts" | "environment" | "beyondCompare" | "sourceTree" | "xampp" | "cleanup" | "dashboard" | "conversations" | "backup" | "skills" | "pets" | "diagnostics" | "settings";
 const navigation: Array<{ id: Page; label: TranslationKey; group: TranslationKey }> = [
   { id: "fileTransfer", label: "fileTransfer.title", group: "nav.tools" },
+  { id: "compression", label: "compression.title", group: "nav.tools" },
   { id: "codexAccounts", label: "codexAccounts.title", group: "nav.codex" },
   { id: "environment", label: "environment.title", group: "nav.manage" }, { id: "cleanup", label: "cleanup.title", group: "nav.tools" },
   { id: "beyondCompare", label: "beyondCompare.title", group: "nav.manage" },
@@ -58,6 +60,7 @@ export function App() {
       {page === "xampp" && <XamppPage />}
       {page === "cleanup" && <CleanupPage />}
       {page === "fileTransfer" && configuration.value && <FileTransferPage configuration={configuration.value} onSaveConfiguration={save} />}
+      {page === "compression" && <CompressionPage />}
       {page === "skills" && <SkillsPage />}
       {page === "pets" && <PetsPage />}
       {page === "diagnostics" && <DiagnosticsPage diagnostics={diagnostics.value} loading={diagnostics.loading} error={diagnostics.error} onRefresh={diagnostics.refresh} />}

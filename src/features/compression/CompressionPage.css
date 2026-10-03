@@ -1,0 +1,17 @@
+.compression-folder { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; align-items: center; gap: 10px; margin: 10px 0; }
+.compression-folder code { overflow-wrap: anywhere; }
+.compression-folder button, .compression-page .file-transfer-actions button { padding: 8px 11px; border: 1px solid #3a4960; border-radius: 7px; color: #eaf3ff; background: #2d4865; }
+.compression-tree { max-height: 330px; overflow: auto; border: 1px solid #3b4659; border-radius: 7px; padding: 8px; }
+.compression-tree label { display: flex; gap: 8px; align-items: center; min-height: 28px; }
+.compression-tree label small { color: #aeb8ca; overflow-wrap: anywhere; }
+.compression-tree-filter { display: grid; gap: 6px; margin: 12px 0; max-width: 520px; }
+.compression-tree-filter input { padding: 8px 9px; color: #eaf0fa; background: #11161f; border: 1px solid #3b4659; border-radius: 6px; }
+.compression-tree-summary, .compression-working { color: #b7c8e5; }
+.compression-working { display: grid; gap: 8px; }
+.compression-show-more { margin-top: 10px; padding: 8px 11px; border: 1px solid #3a4960; border-radius: 7px; color: #eaf3ff; background: #2d4865; }
+.compression-patterns { display: grid; gap: 8px; margin-top: 16px; }
+.compression-patterns textarea { min-height: 80px; width: 100%; padding: 9px; color: #eaf0fa; background: #11161f; border: 1px solid #3b4659; border-radius: 6px; }
+.compression-page fieldset label { display: inline-flex; gap: 6px; align-items: center; margin-right: 18px; }
+.compression-page progress { width: 100%; }
+.compression-progress { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; }
+@media (max-width: 720px) { .compression-folder { grid-template-columns: 1fr; } }

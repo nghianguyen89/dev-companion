@@ -1,9 +1,39 @@
 use crate::{
     backup, codex, codex_environment,
     config::{self, AppConfiguration, ConfigurationError},
-    file_transfer, local_delete, session_storage,
+    compression, file_transfer, local_delete, session_storage,
 };
 use tauri_plugin_dialog::DialogExt;
+
+#[tauri::command]
+pub async fn get_compression_readiness() -> Result<compression::Readiness, String> {
+    run_blocking(compression::readiness).await
+}
+
+#[tauri::command]
+pub async fn scan_compression_source(source: String) -> Result<compression::SourceTree, String> {
+    run_blocking(move || compression::scan_source(&source)).await?
+}
+
+#[tauri::command]
+pub async fn pick_compression_folder(app: tauri::AppHandle, title: String) -> Result<Option<String>, String> {
+    run_blocking(move || Ok(app.dialog().file().set_title(title).blocking_pick_folder().and_then(|folder| folder.into_path().ok()).map(|path| compression::display_path(&path)))).await?
+}
+
+#[tauri::command]
+pub async fn preview_compression(config: compression::CompressionConfig) -> Result<compression::CommandPreview, String> {
+    run_blocking(move || compression::preview(&config)).await?
+}
+
+#[tauri::command]
+pub async fn start_compression(app: tauri::AppHandle, config: compression::CompressionConfig) -> Result<compression::Started, String> {
+    run_blocking(move || compression::start(app, config)).await?
+}
+
+#[tauri::command]
+pub async fn cancel_compression() -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(compression::cancel).await.map_err(|_| "Cancellation did not complete.")?
+}
 
 // ponytail: one global gate; split by proven independent operation classes if this limits responsiveness.
 static COMMAND_GATE: tauri::async_runtime::Mutex<()> = tauri::async_runtime::Mutex::const_new(());

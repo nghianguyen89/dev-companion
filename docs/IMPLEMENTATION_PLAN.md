@@ -1,5 +1,27 @@
 # Implementation Plan — Personal application migration
 
+## 2026-10-03: File Compression
+
+- Add a dedicated `compression.rs` adapter and File Compression page. Do not
+  extend `file_transfer.rs`: Robocopy copies files but cannot create an archive.
+- Use direct hidden `7z.exe` execution only. Detect the executable from the
+  standard 7-Zip installation path and `PATH`; when absent, return a clear
+  install-required readiness state without attempting a download.
+- Load the selected source as a recursive, read-only tree. Users can exclude
+  individual relative files/folders and provide Rust-regex patterns evaluated
+  against slash-normalized source-relative paths. Reparse points are skipped.
+- Produce a `.7z` archive in the selected output folder, defaulting to the
+  source folder's parent. Fast archival uses `-mx=1`; maximum compression uses
+  `-mx=9`. Refuse to overwrite an existing archive.
+- Keep the process, selection validation, temporary list file, output events,
+  cancellation, command preview and tests inside the new module. No generic
+  archive framework, Robocopy staging phase, profiles, or transfer-history
+  integration is needed for this slice.
+- Render canonical Windows paths without the internal `\\?\` prefix. For large
+  source trees, show an honest scanning/preparation state and render a filtered,
+  bounded result list. Surface a percentage only when 7-Zip emits one through
+  `-bsp1`; otherwise retain indeterminate progress.
+
 ## 2026-09-25: File Transfer
 
 - Add one concrete `file_transfer.rs` adapter: pure command construction,

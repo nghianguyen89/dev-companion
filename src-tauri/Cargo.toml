@@ -25,4 +25,5 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 time = { version = "0.3", features = ["formatting"] }
 zip = { version = "2.2", default-features = false, features = ["deflate"] }
 quick-xml = "0.41"
+regex = "1"
 tauri-plugin-dialog = "2.0.0-rc.8"

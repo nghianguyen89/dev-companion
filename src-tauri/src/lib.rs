@@ -3,6 +3,7 @@ mod beyond_compare;
 mod fs_safety;
 mod environment;
 mod file_transfer;
+mod compression;
 mod cleanup;
 mod codex;
 mod codex_environment;
@@ -49,6 +50,9 @@ pub fn run() {
             commands::pick_file_transfer_folder, commands::start_file_transfer,
             commands::cancel_file_transfer, commands::get_file_transfer_history,
             commands::open_file_transfer_log, commands::open_file_transfer_logs_folder
+            ,commands::get_compression_readiness, commands::scan_compression_source,
+            commands::pick_compression_folder, commands::preview_compression,
+            commands::start_compression, commands::cancel_compression
             ,commands::get_beyond_compare_readiness, commands::preview_beyond_compare,
             commands::create_beyond_compare_bundle, commands::inspect_beyond_compare_bundle,
             commands::preview_beyond_compare_recovery, commands::recover_beyond_compare
