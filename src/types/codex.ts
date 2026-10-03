@@ -19,6 +19,12 @@ export interface DiagnosticsSnapshot {
   petsCount: number;
 }
 
+export interface CodexSkill { id: string; manifestBytes: number; }
+export interface CodexSkillsOverview { directory: string; skills: CodexSkill[]; skipped: number; }
+export interface CodexPet { id: string; displayName: string; description: string; spriteVersionNumber: number; spriteFile: string; }
+export interface CodexPetsOverview { directory: string; pets: CodexPet[]; skipped: number; }
+export interface CodexContentActionResult { path: string; }
+
 export interface AppConfiguration {
   theme: "system" | "light" | "dark";
   portableMode: boolean;

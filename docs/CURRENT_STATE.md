@@ -33,6 +33,11 @@ Release/version: 0.2.0
   (`-mx=9`) modes, source-parent output by default, direct output streaming,
   truthful 7-Zip percentage progress, bounded/filterable tree rendering,
   cancellation, reparse-point exclusion, and no-overwrite publication.
+- Local Codex Skills and Pets: direct supported metadata lists; skills import
+  and export into new folders only; pet v2-manifest/sprite validation,
+  create-new installation, and `REMOVE`-confirmed deletion limited to the
+  selected direct pet folder. These workflows never read authentication or
+  display skill bodies.
 
 ### Phase 0–1 addition
 
@@ -102,6 +107,12 @@ Build: pnpm build (pass); Windows x64 NSIS bundle and portable executable (pass,
 `cargo check`, and 8 focused compression tests (including a local 7-Zip smoke
 archive) passed. The full Rust library run had 80 passing tests and one
 pre-existing environment-dependent failure resolving the current user home.
+
+2026-10-03 Skills/Pets: `pnpm check`, `pnpm lint`, `pnpm test` (27), `pnpm
+build`, `cargo check`, and 4 focused Rust contract tests passed. The full Rust
+library run had 87 passing tests and the same pre-existing
+`codex_environment::tests::metadata_crud_and_removal_leave_codex_home_in_place`
+failure because the current user home could not be resolved.
 
 Never mark validation as passing unless it was actually run.
 

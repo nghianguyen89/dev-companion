@@ -1,7 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { CodexContentActionResult, CodexPetsOverview, CodexSkillsOverview } from "../types/codex";
 import type { AppConfiguration, ArchiveInspection, BackupPreview, BackupResult, BeyondCompareBundleInspection, BeyondCompareBundlePreview, BeyondCompareReadiness, BeyondCompareRecoveryPreview, CodexEnvironmentActionResult, CodexEnvironmentInput, CodexEnvironmentInstructions, CodexEnvironmentOverview, CodexPaths, CompressionCommandPreview, CompressionConfig, CompressionReadiness, CompressionSourceTree, ConversationDiscovery, DeletePreview, DeleteResult, DiagnosticsSnapshot, FileTransferCommandPreview, FileTransferConfig, FileTransferDirectoryListing, FileTransferHistoryEntry, FileTransferReadiness, RestoreHistoryEntry, RestorePreview, RestoreResult, SourceTreeInspection, SourceTreePreview, SourceTreeReadiness, SourceTreeRecoveryPreview, XamppInspection, XamppPreview, XamppReadiness, XamppRecoveryPreview } from "../types/codex";
 
 export const getDiagnostics = (): Promise<DiagnosticsSnapshot> => invoke("get_diagnostics");
+export const getSkills = (): Promise<CodexSkillsOverview> => invoke("get_skills");
+export const importSkill = (): Promise<CodexContentActionResult | null> => invoke("import_skill");
+export const exportSkill = (id: string): Promise<CodexContentActionResult | null> => invoke("export_skill", { id });
+export const getPets = (): Promise<CodexPetsOverview> => invoke("get_pets");
+export const installPet = (): Promise<CodexContentActionResult | null> => invoke("install_pet");
+export const removePet = (id: string, confirmation: string): Promise<CodexContentActionResult> => invoke("remove_pet", { id, confirmation });
 export const getPaths = (): Promise<CodexPaths> => invoke("get_codex_paths");
 export const discoverConversations = (): Promise<ConversationDiscovery> => invoke("discover_conversations");
 export const previewBackup = (selectedIds: string[]): Promise<BackupPreview> => invoke("preview_backup", { selectedIds });

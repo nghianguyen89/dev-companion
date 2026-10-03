@@ -6,6 +6,7 @@ mod file_transfer;
 mod compression;
 mod cleanup;
 mod codex;
+mod codex_content;
 mod codex_environment;
 mod commands;
 mod config;
@@ -45,6 +46,8 @@ pub fn run() {
             ,commands::preview_environment, commands::create_environment,
             commands::inspect_environment, commands::preview_environment_restore,
             commands::restore_environment, commands::scan_cleanup, commands::execute_cleanup
+            ,commands::get_skills, commands::import_skill, commands::export_skill,
+            commands::get_pets, commands::install_pet, commands::remove_pet
             ,commands::get_file_transfer_readiness, commands::preview_file_transfer,
             commands::list_file_transfer_directory,
             commands::pick_file_transfer_folder, commands::start_file_transfer,

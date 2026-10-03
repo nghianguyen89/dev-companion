@@ -29,6 +29,10 @@ React features -> services/tauri.ts -> Tauri commands -> codex/session_storage/p
 
 - `platform.rs`: the only place that resolves OS-dependent paths. `CODEX_HOME` overrides the default `~/.codex` location.
 - `codex.rs`: read-only diagnostics and CLI version probes.
+- `codex_content.rs`: concrete local skills/pets adapter. It lists only direct
+  supported metadata, imports/exports skills and installs pets with new-folder
+  semantics, and removes only a confirmed direct pet after reparse-point and
+  regular-file checks. It never reads auth/configuration or returns skill text.
 - `codex_environment.rs`: concrete Windows-first metadata, CLI, launcher,
   current-user PATH, and managed-`AGENTS.md` adapter. It persists only safe
   environment metadata in settings; authentication stays in each CLI-managed

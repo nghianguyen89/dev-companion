@@ -18,6 +18,7 @@ import { useAsyncValue } from "../hooks/useAsyncValue";
 import { getConfiguration, getDiagnostics, saveConfiguration } from "../services/tauri";
 import type { AppConfiguration } from "../types/codex";
 import { I18nProvider, translate, type TranslationKey } from "../i18n";
+import type { TranslationValues } from "../i18n";
 
 type Page = "fileTransfer" | "compression" | "codexAccounts" | "environment" | "beyondCompare" | "sourceTree" | "xampp" | "cleanup" | "dashboard" | "conversations" | "backup" | "skills" | "pets" | "diagnostics" | "settings";
 const navigation: Array<{ id: Page; label: TranslationKey; group: TranslationKey }> = [
@@ -40,7 +41,7 @@ export function App() {
   const { setValue: setConfiguration } = configuration;
   const save = useCallback(async (next: AppConfiguration) => { await saveConfiguration(next); setConfiguration(next); }, [setConfiguration]);
   const language = configuration.value?.language ?? "en";
-  const t = (key: TranslationKey) => translate(language, key);
+  const t = (key: TranslationKey, values?: TranslationValues) => translate(language, key, values);
   const groups = [...new Set(navigation.map((item) => item.group))];
 
   return <I18nProvider value={{ language, t }}><main className="app-shell">

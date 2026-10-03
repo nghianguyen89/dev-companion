@@ -1,5 +1,5 @@
 use crate::{
-    backup, codex, codex_environment,
+    backup, codex, codex_content, codex_environment,
     config::{self, AppConfiguration, ConfigurationError},
     compression, file_transfer, local_delete, session_storage,
 };
@@ -33,6 +33,90 @@ pub async fn start_compression(app: tauri::AppHandle, config: compression::Compr
 #[tauri::command]
 pub async fn cancel_compression() -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(compression::cancel).await.map_err(|_| "Cancellation did not complete.")?
+}
+
+#[tauri::command]
+pub async fn get_skills() -> Result<codex_content::SkillsOverview, String> {
+    run_blocking(codex_content::skills).await?
+}
+#[tauri::command]
+pub async fn import_skill(
+    app: tauri::AppHandle,
+) -> Result<Option<codex_content::ActionResult>, String> {
+    run_blocking(move || {
+        let Some(folder) = app
+            .dialog()
+            .file()
+            .set_title("Select a skill folder")
+            .blocking_pick_folder()
+        else {
+            return Ok(None);
+        };
+        codex_content::import_skill(
+            &folder
+                .into_path()
+                .map_err(|_| "The selected skill folder does not have a readable local path.")?,
+        )
+        .map(Some)
+    })
+    .await?
+}
+#[tauri::command]
+pub async fn export_skill(
+    app: tauri::AppHandle,
+    id: String,
+) -> Result<Option<codex_content::ActionResult>, String> {
+    run_blocking(move || {
+        let Some(folder) = app
+            .dialog()
+            .file()
+            .set_title("Select a folder for the exported skill")
+            .blocking_pick_folder()
+        else {
+            return Ok(None);
+        };
+        codex_content::export_skill(
+            &id,
+            &folder
+                .into_path()
+                .map_err(|_| "The selected destination does not have a readable local path.")?,
+        )
+        .map(Some)
+    })
+    .await?
+}
+#[tauri::command]
+pub async fn get_pets() -> Result<codex_content::PetsOverview, String> {
+    run_blocking(codex_content::pets).await?
+}
+#[tauri::command]
+pub async fn install_pet(
+    app: tauri::AppHandle,
+) -> Result<Option<codex_content::ActionResult>, String> {
+    run_blocking(move || {
+        let Some(folder) = app
+            .dialog()
+            .file()
+            .set_title("Select a pet folder")
+            .blocking_pick_folder()
+        else {
+            return Ok(None);
+        };
+        codex_content::install_pet(
+            &folder
+                .into_path()
+                .map_err(|_| "The selected pet folder does not have a readable local path.")?,
+        )
+        .map(Some)
+    })
+    .await?
+}
+#[tauri::command]
+pub async fn remove_pet(
+    id: String,
+    confirmation: String,
+) -> Result<codex_content::ActionResult, String> {
+    run_blocking(move || codex_content::remove_pet(&id, &confirmation)).await?
 }
 
 // ponytail: one global gate; split by proven independent operation classes if this limits responsiveness.

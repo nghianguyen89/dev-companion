@@ -1,5 +1,23 @@
 # Implementation Plan — Personal application migration
 
+## 2026-10-03: Local Codex skills and pets
+
+- Replace the two Milestone 4 placeholders with concrete local workflows; do
+  not add a generic extension/package framework or network catalog.
+- Skills: list only direct, valid `CODEX_HOME/skills/<name>/SKILL.md` metadata;
+  import a user-selected skill folder and export a selected installed skill to
+  a user-selected folder. Both operations create a new directory only.
+- Pets: list only validated v2 `CODEX_HOME/pets/<id>` manifests; install the
+  contract's `pet.json` and PNG/WebP sprite as a new directory, and remove a
+  selected direct child only after the literal `REMOVE` confirmation.
+- All filesystem work remains in Rust behind narrow commands. Reject unsafe
+  names, symbolic links/junctions and non-regular files; do not read Codex
+  auth/configuration, display skill bodies, overwrite a target, or delete
+  anything outside the selected direct pet directory.
+- Copy into a sibling temporary directory and rename only after success. Add
+  focused Rust contract tests plus frontend rendering tests; validate with
+  TypeScript checks, tests, Rust tests and diff whitespace checks.
+
 ## 2026-10-03: File Compression
 
 - Add a dedicated `compression.rs` adapter and File Compression page. Do not
