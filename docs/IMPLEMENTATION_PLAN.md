@@ -1,5 +1,26 @@
 # Implementation Plan — Personal application migration
 
+## 2026-10-04: Multi-account Codex migration
+
+- Add one concrete `codex_migration.rs` workflow under the Codex navigation
+  group. Keep `environment.rs` and its environment-v2 reader unchanged so
+  existing archives remain compatible.
+- At page load, detect the current user's direct `.codex` and `.codex-*`
+  directories, deduplicate them with the active `CODEX_HOME`, and offer each
+  existing account as a selected-by-default backup source.
+- Offer recommended checkboxes for chat history/databases, safe configuration
+  and instructions, skills, and pets. Offer worktrees, plugins, and
+  visualizations as opt-in space-heavy components. Runtime caches, sandboxes,
+  vendor imports, and official CLI authentication or machine-identity files
+  remain excluded regardless of selection.
+- Produce a strict versioned ZIP with per-account relative paths and SHA-256
+  validation. Restore only after inspection and `RESTORE`; create files only
+  beneath the current user's matching `.codex*` account folders, skip every
+  existing conflict, and roll back files created by a failed operation.
+- Require Codex to be closed before preview, archive creation, or restore.
+  Add focused Rust round-trip/rejection coverage and a React rendering test;
+  run the relevant TypeScript, lint, test, Rust, and whitespace checks.
+
 ## 2026-10-03: Local Codex skills and pets
 
 - Replace the two Milestone 4 placeholders with concrete local workflows; do

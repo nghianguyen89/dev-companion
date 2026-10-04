@@ -1,5 +1,5 @@
 use crate::{
-    backup, codex, codex_content, codex_environment, compression,
+    codex, codex_content, codex_environment, compression,
     config::{self, AppConfiguration, ConfigurationError},
     file_transfer, local_delete, session_storage,
 };
@@ -513,6 +513,66 @@ pub async fn restore_environment(
     run_blocking(move || crate::environment::restore(&token, &confirmation)).await?
 }
 #[tauri::command]
+pub async fn get_codex_migration_overview() -> Result<crate::codex_migration::Overview, String> {
+    run_blocking(crate::codex_migration::overview).await?
+}
+#[tauri::command]
+pub async fn preview_codex_migration(
+    account_ids: Vec<String>,
+    groups: Vec<String>,
+) -> Result<crate::codex_migration::Preview, String> {
+    run_blocking(move || crate::codex_migration::preview(account_ids, groups)).await?
+}
+#[tauri::command]
+pub async fn create_codex_migration(
+    token: String,
+) -> Result<crate::codex_migration::Created, String> {
+    run_blocking(move || crate::codex_migration::create(&token)).await?
+}
+#[tauri::command]
+pub async fn list_codex_migration_archives() -> Result<crate::codex_migration::Archives, String> {
+    run_blocking(crate::codex_migration::list_archives).await?
+}
+#[tauri::command]
+pub async fn open_codex_migration_archive(name: String) -> Result<(), String> {
+    run_blocking(move || crate::codex_migration::open_archive(&name)).await?
+}
+#[tauri::command]
+pub async fn delete_codex_migration_archive(name: String) -> Result<(), String> {
+    run_blocking(move || crate::codex_migration::delete_archive(&name)).await?
+}
+#[tauri::command]
+pub async fn inspect_codex_migration(
+    app: tauri::AppHandle,
+) -> Result<Option<crate::codex_migration::Preview>, String> {
+    run_blocking(move || {
+        let Some(file) = app
+            .dialog()
+            .file()
+            .add_filter("Codex migration ZIP", &["zip"])
+            .blocking_pick_file()
+        else {
+            return Ok(None);
+        };
+        crate::codex_migration::inspect(file.into_path().map_err(|error| error.to_string())?)
+            .map(Some)
+    })
+    .await?
+}
+#[tauri::command]
+pub async fn preview_codex_migration_restore(
+    token: String,
+) -> Result<crate::codex_migration::RestorePreview, String> {
+    run_blocking(move || crate::codex_migration::preview_restore(&token)).await?
+}
+#[tauri::command]
+pub async fn restore_codex_migration(
+    token: String,
+    confirmation: String,
+) -> Result<crate::codex_migration::Restored, String> {
+    run_blocking(move || crate::codex_migration::restore(&token, &confirmation)).await?
+}
+#[tauri::command]
 pub async fn scan_cleanup() -> Result<crate::cleanup::Scan, String> {
     run_blocking(crate::cleanup::scan).await?
 }
@@ -634,115 +694,25 @@ pub async fn discover_conversations() -> Result<session_storage::ConversationDis
     run_blocking(session_storage::discover_sessions).await
 }
 #[tauri::command]
-pub async fn preview_backup(
-    selected_ids: Vec<String>,
-) -> Result<backup::BackupPreview, backup::BackupError> {
-    run_blocking(move || {
-        let configuration = config::load().map_err(configuration_error)?;
-        backup::preview(&configuration, &selected_ids)
-    })
-    .await
-    .map_err(backup::BackupError::from_message)?
-    .map_err(backup::BackupError::from_message)
-}
-#[tauri::command]
-pub async fn create_backup(
-    selected_ids: Vec<String>,
-) -> Result<backup::BackupResult, backup::BackupError> {
-    run_blocking(move || {
-        let configuration = config::load().map_err(configuration_error)?;
-        backup::create(&configuration, &selected_ids)
-    })
-    .await
-    .map_err(backup::BackupError::from_message)?
-    .map_err(backup::BackupError::from_message)
-}
-#[tauri::command]
-pub async fn inspect_backup_archive(
-    app: tauri::AppHandle,
-) -> Result<Option<backup::ArchiveInspection>, String> {
-    run_blocking(move || {
-        let Some(selected) = app
-            .dialog()
-            .file()
-            .set_title("Choose a Codex backup archive")
-            .add_filter("ZIP archives", &["zip"])
-            .blocking_pick_file()
-        else {
-            return Ok(None);
-        };
-        let path = selected
-            .into_path()
-            .map_err(|_| "The selected archive does not have a readable local path.")?;
-        let mut inspection = backup::inspect(&path)?;
-        if inspection.validation.valid {
-            inspection.restore_token = Some(backup::register_restore_archive(path));
-        }
-        Ok(Some(inspection))
-    })
-    .await?
-}
-#[tauri::command]
-pub async fn preview_restore(
-    restore_token: String,
-    selected_ids: Vec<String>,
-) -> Result<backup::RestorePreview, backup::BackupError> {
-    run_blocking(move || {
-        let configuration = config::load().map_err(configuration_error)?;
-        backup::preview_restore(&configuration, &restore_token, &selected_ids)
-    })
-    .await
-    .map_err(backup::BackupError::from_message)?
-    .map_err(backup::BackupError::from_message)
-}
-#[tauri::command]
-pub async fn restore_archive(
-    restore_token: String,
-    selected_ids: Vec<String>,
-) -> Result<backup::RestoreResult, backup::BackupError> {
-    run_blocking(move || {
-        let configuration = config::load().map_err(configuration_error)?;
-        backup::restore(&configuration, &restore_token, &selected_ids)
-    })
-    .await
-    .map_err(backup::BackupError::from_message)?
-    .map_err(backup::BackupError::from_message)
-}
-#[tauri::command]
-pub async fn get_restore_history(
-) -> Result<Vec<crate::restore_history::RestoreHistoryEntry>, backup::BackupError> {
-    run_blocking(|| {
-        let configuration = config::load().map_err(configuration_error)?;
-        crate::restore_history::list(&configuration)
-    })
-    .await
-    .map_err(backup::BackupError::from_message)?
-    .map_err(backup::BackupError::from_message)
-}
-#[tauri::command]
 pub async fn preview_local_delete(
     selected_ids: Vec<String>,
-) -> Result<local_delete::DeletePreview, backup::BackupError> {
+) -> Result<local_delete::DeletePreview, String> {
     run_blocking(move || {
         let configuration = config::load().map_err(configuration_error)?;
         local_delete::preview(&configuration, &selected_ids)
     })
-    .await
-    .map_err(backup::BackupError::from_message)?
-    .map_err(backup::BackupError::from_message)
+    .await?
 }
 #[tauri::command]
 pub async fn execute_local_delete(
     selected_ids: Vec<String>,
     confirmation: String,
-) -> Result<local_delete::DeleteResult, backup::BackupError> {
+) -> Result<local_delete::DeleteResult, String> {
     run_blocking(move || {
         let configuration = config::load().map_err(configuration_error)?;
         local_delete::execute(&configuration, &selected_ids, &confirmation)
     })
-    .await
-    .map_err(backup::BackupError::from_message)?
-    .map_err(backup::BackupError::from_message)
+    .await?
 }
 #[tauri::command]
 pub async fn get_configuration() -> Result<AppConfiguration, String> {

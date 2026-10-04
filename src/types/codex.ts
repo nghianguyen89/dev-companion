@@ -100,6 +100,18 @@ export interface CodexEnvironmentOverview {
 }
 export interface CodexEnvironmentInstructions { content: string; managed: boolean; }
 export interface CodexEnvironmentActionResult { message: string; }
+export type CodexMigrationGroup = "chat" | "settings" | "skills" | "pets" | "worktrees" | "plugins" | "visualizations";
+export interface CodexMigrationAccount { id: string; label: string; folder: string; }
+export interface CodexMigrationEntry { accountId: string; relativePath: string; archivePath: string; group: CodexMigrationGroup; bytes: number; sha256: string; }
+export interface CodexMigrationGroupSummary { id: string; files: number; bytes: number; reason: string; }
+export interface CodexMigrationAccountEstimate { accountId: string; groups: CodexMigrationGroupSummary[]; }
+export interface CodexMigrationOverview { accounts: CodexMigrationAccount[]; estimates: CodexMigrationAccountEstimate[]; }
+export interface CodexMigrationPreview { token: string; accounts: CodexMigrationAccount[]; groups: CodexMigrationGroupSummary[]; excluded: CodexMigrationGroupSummary[]; entries: CodexMigrationEntry[]; }
+export interface CodexMigrationCreated { archivePath: string; archiveBytes: number; files: number; }
+export interface CodexMigrationArchive { name: string; bytes: number; modifiedAt: number | null; }
+export interface CodexMigrationArchives { directory: string; archives: CodexMigrationArchive[]; totalBytes: number; }
+export interface CodexMigrationRestorePreview { token: string; items: Array<{ accountLabel: string; path: string; archivePath: string; status: "new" | "identical" | "conflict"; bytes: number }>; }
+export interface CodexMigrationRestored { restored: number; skipped: number; errors: string[]; rollbackRemaining: number; }
 
 export type ConversationDiscoveryStatus = "ready" | "codexHomeMissing" | "sessionDirectoryMissing" | "permissionDenied" | "filesystemUnavailable";
 
@@ -122,7 +134,7 @@ export interface ConversationDiscovery {
   unsupported: number;
 }
 
-export interface BackupSession {
+export interface DeleteSession {
   id: string;
   title: string | null;
   createdAt: string | null;
@@ -131,52 +143,9 @@ export interface BackupSession {
   bytes: number;
 }
 
-export interface BackupPreview {
-  formatVersion: number;
-  sessionCount: number;
-  totalBytes: number;
-  backupDirectory: string;
-  sessions: BackupSession[];
-}
-
-export interface BackupResult {
-  archivePath: string;
-  sessionCount: number;
-  totalBytes: number;
-}
-
-export interface ArchiveInspection {
-  archiveName: string;
-  createdAt: string | null;
-  platform: string | null;
-  codexCliVersion: string | null;
-  sessionCount: number;
-  totalBytes: number;
-  validation: { valid: boolean; formatVersion: number | null };
-  warnings: string[];
-  errors: string[];
-  restoreToken: string | null;
-  sessions: BackupSession[];
-}
-export interface RestorePreview { sessionCount: number; totalBytes: number; destinationRoot: string; sessions: Array<{ id: string; archivePath: string; destinationPath: string; bytes: number; conflict: boolean }>; conflictCount: number; plannedCreates: number; safetyBackupWillBeCreated: boolean; }
-export interface RestoreResult { restoredCount: number; skippedConflicts: number; totalBytes: number; safetyBackupPath: string | null; }
-export interface DeletePreview { formatVersion: number; sessionCount: number; totalBytes: number; quarantineDirectory: string; sessions: BackupSession[]; localOnly: boolean; }
+export interface DeletePreview { formatVersion: number; sessionCount: number; totalBytes: number; quarantineDirectory: string; sessions: DeleteSession[]; localOnly: boolean; }
 export type DeleteOutcome = "completed" | "partial" | "rolledBack" | "failed";
 export interface DeleteResult { outcome: DeleteOutcome; deletedCount: number; restoredCount: number; skippedCount: number; totalBytes: number; safetyArchivePath: string | null; }
-export type RestoreOutcome = "completed" | "partial" | "rolledBack" | "failed";
-export type HistoryAction = "restore" | "delete";
-export interface RestoreHistoryEntry {
-  occurredAt: string;
-  action: HistoryAction;
-  archiveName: string;
-  sessionIds: string[];
-  deletedCount: number;
-  restoredCount: number;
-  skippedConflicts: number;
-  safetyBackupPath: string | null;
-  outcome: RestoreOutcome;
-  errorCode: string | null;
-}
 
 export interface BeyondCompareReadiness { supported: boolean; secretExportAcknowledgementRequired: boolean; }
 export interface BeyondCompareBundlePreview { token: string; packageName: string; bytes: number; sensitive: boolean; }

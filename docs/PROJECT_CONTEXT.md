@@ -39,8 +39,6 @@ The session adapter has an explicit compatibility contract: only legacy first-re
 - `src-tauri/src/platform.rs`: platform path resolution
 - `src-tauri/src/codex.rs`: diagnostics and Codex-facing read-only logic
 - `src-tauri/src/session_storage.rs`: session discovery adapter
-- `src-tauri/src/backup.rs`: selected-session ZIP preview, inspection, and restore
-- `src-tauri/src/restore_history.rs`: bounded, privacy-minimized restore audit storage
 - `src-tauri/src/commands.rs`: Tauri command boundary
 - `src/features/conversations/ConversationsPage.tsx`: local list, filtering, sorting, and refresh UI
 - `docs/ARCHITECTURE.md`: system design

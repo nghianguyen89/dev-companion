@@ -1,5 +1,5 @@
 import { invoke as invokeNative } from "@tauri-apps/api/core";
-import type { AppConfiguration, ArchiveInspection, BackupPreview, BackupResult, BackupStorageOverview, BeyondCompareBundleInspection, BeyondCompareBundlePreview, BeyondCompareReadiness, BeyondCompareRecoveryPreview, CodexContentActionResult, CodexEnvironmentActionResult, CodexEnvironmentInput, CodexEnvironmentInstructions, CodexEnvironmentOverview, CodexPaths, CodexPetsOverview, CodexSkillsOverview, CompressionCommandPreview, CompressionConfig, CompressionReadiness, CompressionSourceTree, ConversationDiscovery, DeletePreview, DeleteResult, DiagnosticsSnapshot, FileTransferCommandPreview, FileTransferConfig, FileTransferDirectoryListing, FileTransferHistoryEntry, FileTransferReadiness, RestoreHistoryEntry, RestorePreview, RestoreResult, SourceTreeInspection, SourceTreePreview, SourceTreeReadiness, SourceTreeRecoveryPreview, XamppInspection, XamppPreview, XamppReadiness, XamppRecoveryPreview } from "../types/codex";
+import type { AppConfiguration, BackupStorageOverview, BeyondCompareBundleInspection, BeyondCompareBundlePreview, BeyondCompareReadiness, BeyondCompareRecoveryPreview, CodexContentActionResult, CodexEnvironmentActionResult, CodexEnvironmentInput, CodexEnvironmentInstructions, CodexEnvironmentOverview, CodexMigrationArchives, CodexMigrationCreated, CodexMigrationGroup, CodexMigrationOverview, CodexMigrationPreview, CodexMigrationRestorePreview, CodexMigrationRestored, CodexPaths, CodexPetsOverview, CodexSkillsOverview, CompressionCommandPreview, CompressionConfig, CompressionReadiness, CompressionSourceTree, ConversationDiscovery, DeletePreview, DeleteResult, DiagnosticsSnapshot, FileTransferCommandPreview, FileTransferConfig, FileTransferDirectoryListing, FileTransferHistoryEntry, FileTransferReadiness, SourceTreeInspection, SourceTreePreview, SourceTreeReadiness, SourceTreeRecoveryPreview, XamppInspection, XamppPreview, XamppReadiness, XamppRecoveryPreview } from "../types/codex";
 
 export const isTauriRuntime = () => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 const browserPreviewConfiguration: AppConfiguration = { theme: "system", portableMode: false, createSafetyBackups: true, language: "en", logLevel: "warn", codexEnvironments: [], fileTransferProfiles: [] };
@@ -17,12 +17,6 @@ export const installPet = (): Promise<CodexContentActionResult | null> => invoke
 export const removePet = (id: string, confirmation: string): Promise<CodexContentActionResult> => invoke("remove_pet", { id, confirmation });
 export const getPaths = (): Promise<CodexPaths> => invoke("get_codex_paths");
 export const discoverConversations = (): Promise<ConversationDiscovery> => invoke("discover_conversations");
-export const previewBackup = (selectedIds: string[]): Promise<BackupPreview> => invoke("preview_backup", { selectedIds });
-export const createBackup = (selectedIds: string[]): Promise<BackupResult> => invoke("create_backup", { selectedIds });
-export const inspectBackupArchive = (): Promise<ArchiveInspection | null> => invoke("inspect_backup_archive");
-export const previewRestore = (restoreToken: string, selectedIds: string[]): Promise<RestorePreview> => invoke("preview_restore", { restoreToken, selectedIds });
-export const restoreArchive = (restoreToken: string, selectedIds: string[]): Promise<RestoreResult> => invoke("restore_archive", { restoreToken, selectedIds });
-export const getRestoreHistory = (): Promise<RestoreHistoryEntry[]> => invoke("get_restore_history");
 export const previewLocalDelete = (selectedIds: string[]): Promise<DeletePreview> => invoke("preview_local_delete", { selectedIds });
 export const executeLocalDelete = (selectedIds: string[], confirmation: string): Promise<DeleteResult> => invoke("execute_local_delete", { selectedIds, confirmation });
 export const getBeyondCompareReadiness = (): Promise<BeyondCompareReadiness> => invoke("get_beyond_compare_readiness");
@@ -64,6 +58,15 @@ export const deleteCodexEnvironment = (id: string, confirmation: string): Promis
 export const openCodexEnvironmentHome = (id: string): Promise<CodexEnvironmentActionResult> => invoke("open_codex_environment_home", { id });
 export const openCodexEnvironmentAgents = (id: string): Promise<CodexEnvironmentActionResult> => invoke("open_codex_environment_agents", { id });
 export const runCodexEnvironmentAction = (id: string, action: "launch" | "login" | "logout"): Promise<CodexEnvironmentActionResult> => invoke("run_codex_environment_action", { id, action });
+export const getCodexMigrationOverview = (): Promise<CodexMigrationOverview> => invoke("get_codex_migration_overview");
+export const previewCodexMigration = (accountIds: string[], groups: CodexMigrationGroup[]): Promise<CodexMigrationPreview> => invoke("preview_codex_migration", { accountIds, groups });
+export const createCodexMigration = (token: string): Promise<CodexMigrationCreated> => invoke("create_codex_migration", { token });
+export const listCodexMigrationArchives = (): Promise<CodexMigrationArchives> => invoke("list_codex_migration_archives");
+export const openCodexMigrationArchive = (name: string): Promise<void> => invoke("open_codex_migration_archive", { name });
+export const deleteCodexMigrationArchive = (name: string): Promise<void> => invoke("delete_codex_migration_archive", { name });
+export const inspectCodexMigration = (): Promise<CodexMigrationPreview | null> => invoke("inspect_codex_migration");
+export const previewCodexMigrationRestore = (token: string): Promise<CodexMigrationRestorePreview> => invoke("preview_codex_migration_restore", { token });
+export const restoreCodexMigration = (token: string, confirmation: string): Promise<CodexMigrationRestored> => invoke("restore_codex_migration", { token, confirmation });
 export const getFileTransferReadiness = (): Promise<FileTransferReadiness> => invoke("get_file_transfer_readiness");
 export const listFileTransferDirectory = (path: string): Promise<FileTransferDirectoryListing> => invoke("list_file_transfer_directory", { path });
 const fileTransferPayload = (config: FileTransferConfig): FileTransferConfig => ({ ...config, includeSubfolders: config.includeSubfolders === true, preserveTimestamps: config.preserveTimestamps === true, skipJunctionPoints: config.skipJunctionPoints === true, restartable: config.restartable === true, copyEmptyDirectories: config.copyEmptyDirectories === true, verifyDestination: config.verifyDestination === true, saveLog: config.saveLog === true, shutdownWhenFinished: config.shutdownWhenFinished === true, selectionEnabled: config.selectionEnabled === true, mirrorConfirmed: config.mirrorConfirmed === true, systemLocationConfirmed: config.systemLocationConfirmed === true, destinationDataConfirmed: config.destinationDataConfirmed === true });

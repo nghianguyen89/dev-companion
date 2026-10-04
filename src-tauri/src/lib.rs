@@ -1,9 +1,9 @@
-mod backup;
 mod beyond_compare;
 mod cleanup;
 mod codex;
 mod codex_content;
 mod codex_environment;
+mod codex_migration;
 mod commands;
 mod compression;
 mod config;
@@ -14,17 +14,14 @@ mod local_delete;
 mod logging;
 mod personal_bundle;
 mod platform;
-mod restore_history;
 mod session_storage;
 mod sourcetree;
 mod sourcetree_config;
 mod xampp;
 
 use commands::{
-    create_backup, discover_conversations, execute_local_delete, get_backup_storage,
-    get_codex_paths, get_configuration, get_diagnostics, get_restore_history,
-    inspect_backup_archive, preview_backup, preview_local_delete, preview_restore, restore_archive,
-    save_configuration,
+    discover_conversations, execute_local_delete, get_backup_storage, get_codex_paths,
+    get_configuration, get_diagnostics, preview_local_delete, save_configuration,
 };
 
 pub fn run() {
@@ -36,12 +33,6 @@ pub fn run() {
             get_backup_storage,
             get_codex_paths,
             discover_conversations,
-            preview_backup,
-            create_backup,
-            inspect_backup_archive,
-            preview_restore,
-            restore_archive,
-            get_restore_history,
             preview_local_delete,
             execute_local_delete,
             get_configuration,
@@ -51,6 +42,15 @@ pub fn run() {
             commands::inspect_environment,
             commands::preview_environment_restore,
             commands::restore_environment,
+            commands::get_codex_migration_overview,
+            commands::preview_codex_migration,
+            commands::create_codex_migration,
+            commands::list_codex_migration_archives,
+            commands::open_codex_migration_archive,
+            commands::delete_codex_migration_archive,
+            commands::inspect_codex_migration,
+            commands::preview_codex_migration_restore,
+            commands::restore_codex_migration,
             commands::scan_cleanup,
             commands::execute_cleanup,
             commands::get_skills,

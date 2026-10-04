@@ -38,8 +38,6 @@ React features -> services/tauri.ts -> Tauri commands -> codex/session_storage/p
   environment metadata in settings; authentication stays in each CLI-managed
   `CODEX_HOME` and is never read, copied, logged, or returned to React.
 - `session_storage.rs`: version-conscious, read-only legacy rollout-session adapter. It recursively locates `.jsonl` files below the resolved `sessions/` root, reads only each file's first JSON record, and supports only `type: session_meta` with `payload.session_id` or `payload.id`. Optional labels and update timestamps come from `session_index.jsonl`. It never reads message records or guesses a newer schema.
-- `backup.rs`: export, inspection, and restore boundary. Restore accepts an opaque token from a successful inspection, revalidates the ZIP immediately before preview and copying, allows only explicitly selected manifest sessions, verifies the supported JSONL metadata variant and matching ID, re-snapshots conflicts at execution, emits structured `{ code, message }` failures, and writes under canonical `CODEX_HOME/sessions` through create-new semantics with rollback. Safety backups are independently versioned ZIPs with their own manifest.
-- `restore_history.rs`: a local, read-only audit store at `config/restore-history-v1.json`. It keeps newest-first, capped history DTOs and returns only safe summary fields to React.
 - `config.rs`: small JSON settings file, with safe defaults.
 - `commands.rs`: the allowlisted interface available to the frontend. Its async
   wrappers send filesystem, process and dialog work to Tauri's blocking pool.
@@ -68,7 +66,7 @@ Restore never overwrites: existing destination files are reported as conflicts a
 Restore history is Companion-owned storage, not Codex storage. Its format version is currently `1`; a malformed, symlinked, or future-version history file is unavailable rather than parsed speculatively. History persistence never contains session content, full archive source paths, tokens, credentials, or native error diagnostics.
 # Milestone 6: deletion path
 
-`ConversationsPage` sends only selected IDs and the literal confirmation. The Tauri command re-discovers and canonicalizes `CODEX_HOME/sessions`, accepts only regular non-symlink legacy files, snapshots exactly those files into a versioned quarantine ZIP plus `delete-manifest.json`, then verifies ZIP entries and metadata before calling `remove_file`. A mid-flight failure triggers strict create-new restoration from the verified ZIP; it never overwrites a concurrent file.
+`ConversationsPage` sends only selected IDs and the literal confirmation. The Tauri command re-discovers and canonicalizes `CODEX_HOME/sessions`, accepts only regular non-symlink legacy files, snapshots exactly those files into a versioned quarantine ZIP plus `delete-manifest.json`, then verifies ZIP entries and metadata before calling `remove_file`. A mid-flight failure triggers strict create-new restoration from the verified ZIP; it never overwrites a concurrent file. The selected-session backup/restore screen is removed.
 
 ## Codex Environment Manager
 
@@ -79,6 +77,18 @@ instructions, or CLI authentication. Launcher files live in `%USERPROFILE%\\bin`
 and User PATH changes use `HKCU\\Environment` only. `AGENTS.md` edits replace a
 single marker-delimited block after a timestamped backup, preserving user text
 outside it; missing or malformed markers abort the change.
+
+## Codex Migration
+
+`codex_migration.rs` is a separate strict ZIP workflow for the current user's
+direct `.codex` and `.codex-*` folders. It snapshots selected accounts and
+components through narrow commands, validates the complete SHA-256 inventory,
+and restores only create-new files to the matching folder names. It never
+copies official CLI authentication, machine identity, runtime cache or sandbox
+data; destination conflicts remain untouched.
+The archive list exposes only direct regular `codex-migration-<timestamp>.zip`
+files in the Companion backup directory; its reveal/delete commands revalidate
+that narrow filename and reject links or arbitrary paths.
 
 ## Phase 0–1 personal bundle boundary
 

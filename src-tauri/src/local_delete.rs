@@ -10,10 +10,8 @@ use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 use zip::{write::SimpleFileOptions, CompressionMethod, ZipArchive, ZipWriter};
 
 use crate::{
-    backup::BackupSession,
     config::AppConfiguration,
     platform,
-    restore_history::{self, RestoreOutcome},
     session_storage::{self, SelectedSession},
 };
 
@@ -28,8 +26,18 @@ pub struct DeletePreview {
     pub session_count: usize,
     pub total_bytes: u64,
     pub quarantine_directory: String,
-    pub sessions: Vec<BackupSession>,
+    pub sessions: Vec<DeleteSession>,
     pub local_only: bool,
+}
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteSession {
+    pub id: String,
+    pub title: Option<String>,
+    pub created_at: Option<String>,
+    pub updated_at: Option<String>,
+    pub archive_path: String,
+    pub bytes: u64,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -113,12 +121,8 @@ pub fn execute(
 ) -> Result<DeleteResult, String> {
     let home = platform::codex_home();
     match execute_at(configuration, &home, ids, confirmation, None, None) {
-        Ok(result) => {
-            record(configuration, ids, &result, None);
-            Ok(result)
-        }
+        Ok(result) => Ok(result),
         Err(failure) => {
-            record(configuration, ids, &failure.result, Some(failure.code));
             if failure.result.safety_archive_path.is_some() {
                 Ok(failure.result)
             } else {
@@ -228,38 +232,7 @@ fn execute_at(
     })
 }
 
-fn record(
-    configuration: &AppConfiguration,
-    ids: &[String],
-    result: &DeleteResult,
-    code: Option<&str>,
-) {
-    let outcome = match result.outcome {
-        DeleteOutcome::Completed => RestoreOutcome::Completed,
-        DeleteOutcome::Partial => RestoreOutcome::Partial,
-        DeleteOutcome::RolledBack => RestoreOutcome::RolledBack,
-        DeleteOutcome::Failed => RestoreOutcome::Failed,
-    };
-    // Failed requests that never passed the resolver are not persisted: this keeps arbitrary
-    // frontend-supplied IDs out of the local audit file.
-    if result.safety_archive_path.is_none() && result.deleted_count == 0 {
-        return;
-    }
-    if let Err(error) = restore_history::record_delete(
-        configuration,
-        ids.to_vec(),
-        result.deleted_count,
-        result.restored_count,
-        result.skipped_count,
-        result.safety_archive_path.clone(),
-        outcome,
-        code.map(str::to_owned),
-    ) {
-        tracing::warn!("delete history could not be recorded: {error}");
-    }
-}
-
-fn describe(selected: &[SelectedSession]) -> Result<(Vec<BackupSession>, u64), String> {
+fn describe(selected: &[SelectedSession]) -> Result<(Vec<DeleteSession>, u64), String> {
     let root = session_storage::canonical_sessions_root(&platform::codex_home())?;
     let mut total = 0_u64;
     let sessions = selected
@@ -272,7 +245,7 @@ fn describe(selected: &[SelectedSession]) -> Result<(Vec<BackupSession>, u64), S
             total = total
                 .checked_add(bytes)
                 .ok_or("Selected files are too large.")?;
-            Ok(BackupSession {
+            Ok(DeleteSession {
                 id: item.summary.id.clone(),
                 title: item.summary.title.clone(),
                 created_at: item.summary.created_at.clone(),

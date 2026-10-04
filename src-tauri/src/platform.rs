@@ -61,10 +61,6 @@ pub fn personal_staging_dir() -> PathBuf {
     app_data_dir().join("staging")
 }
 
-pub fn restore_history_file(configuration: &AppConfiguration) -> PathBuf {
-    config_dir(configuration).join("restore-history-v1.json")
-}
-
 /// Safety archives for local legacy-session deletion live in Companion data, never in
 /// CODEX_HOME. They are intentionally retained until the user removes them manually.
 pub fn delete_quarantine_dir(configuration: &AppConfiguration) -> PathBuf {

@@ -30,7 +30,7 @@ export function DashboardPage({ diagnostics, backupStorage, loading, error, onRe
         <h2>{t("dashboard.backupData")}</h2>
         <p>{t("dashboard.backupDataText")}</p>
         {error && <p role="alert" className="error-banner">{error}</p>}
-        {backupStorage && <div className="dashboard-backup-grid"><BackupStorage title={t("dashboard.sessionBackups")} storage={backupStorage.sessionBackups} language={language} /><BackupStorage title={t("dashboard.personalBundles")} storage={backupStorage.personalBundles} language={language} /></div>}
+        {backupStorage && <div className="dashboard-backup-grid"><BackupStorage title={t("dashboard.backups")} storage={backupStorage.sessionBackups} language={language} /><BackupStorage title={t("dashboard.personalBundles")} storage={backupStorage.personalBundles} language={language} /></div>}
       </section>
       <section className="notice-card">
         <h2>{t("dashboard.safe")}</h2>

@@ -23,6 +23,15 @@ Release/version: 0.2.0
   login/logout/launch handoff, safe `.cmd` launchers, User PATH opt-in, and
   marker-preserving global `AGENTS.md` management. It never persists or reads
   authentication credentials; removing metadata never deletes `CODEX_HOME`.
+- Codex Migration: scans the current user's direct `.codex` and `.codex-*`
+  accounts, creates one strict SHA-256 ZIP with selected per-account content,
+  and restores only missing files into matching account folders. Chat/local
+  databases, safe settings, skills and pets are recommended; worktrees,
+  plugins and visualizations are opt-in. Authentication, machine identity,
+  runtime caches and sandboxes are always excluded. Component and selected
+  backup-total estimates are calculated from current source metadata. The
+  module lists its own ZIPs with timestamps and sizes, can reveal one in
+  Explorer, and deletes only a confirmed, direct regular migration ZIP.
 - File Transfer: direct Windows Robocopy Simple/Fast/Project Migration/Mirror
   workflows with navigable Source/Destination direct-child views, safe source
   selection, hidden/system icon/color legend, preview, confirmations, dry-run,
@@ -52,6 +61,9 @@ Release/version: 0.2.0
 - Dashboard is the first navigation group and shows current local feature
   counts plus read-only direct-file inventories for session backups and
   personal application bundles.
+- Settings also includes an in-app Guide covering each visible workflow and an
+  About page that displays the current version and release notes from
+  `src/app/releaseNotes.ts`.
 
 ### Phase 0–1 addition
 
