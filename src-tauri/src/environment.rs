@@ -110,7 +110,29 @@ pub fn digest(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
-pub fn require_closed() -> Result<()> {
+const CODEX_PROCESS_NAMES: &[&str] = &["codex.exe", "codex-cli.exe", "codex-app-server.exe"];
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexProcessResult {
+    pub terminated: usize,
+}
+
+fn parse_codex_processes(output: &str) -> Vec<String> {
+    output
+        .lines()
+        .filter_map(|line| {
+            let name = line
+                .split(',')
+                .next()?
+                .trim_matches('"')
+                .to_ascii_lowercase();
+            CODEX_PROCESS_NAMES.contains(&name.as_str()).then_some(name)
+        })
+        .collect()
+}
+
+fn codex_processes() -> Result<Vec<String>> {
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -122,26 +144,51 @@ pub fn require_closed() -> Result<()> {
         if !output.status.success() {
             return Err("Cannot check Codex processes.".into());
         }
-        if String::from_utf8_lossy(&output.stdout).lines().any(|line| {
-            let name = line
-                .split(',')
-                .next()
-                .unwrap_or("")
-                .trim_matches('"')
-                .to_ascii_lowercase();
-            matches!(
-                name.as_str(),
-                "codex.exe" | "codex-cli.exe" | "codex-app-server.exe"
-            )
-        }) {
-            return Err("Close Codex Desktop and all Codex CLI processes, then scan again. Companion never closes them automatically.".into());
-        }
-        Ok(())
+        Ok(parse_codex_processes(&String::from_utf8_lossy(
+            &output.stdout,
+        )))
     }
     #[cfg(not(windows))]
     {
         Err("Environment snapshot currently supports Windows only.".into())
     }
+}
+
+pub fn stop_codex_processes(confirmation: &str) -> Result<CodexProcessResult> {
+    if confirmation != "CLOSE CODEX" {
+        return Err("Type CLOSE CODEX to stop Codex processes.".into());
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        let processes = codex_processes()?;
+        for name in processes.iter().collect::<std::collections::HashSet<_>>() {
+            let _ = std::process::Command::new("taskkill.exe")
+                .args(["/IM", name, "/T", "/F"])
+                .creation_flags(0x08000000)
+                .status();
+        }
+        if !codex_processes()?.is_empty() {
+            return Err(
+                "Some Codex processes could not be stopped. Close them in Task Manager and retry."
+                    .into(),
+            );
+        }
+        Ok(CodexProcessResult {
+            terminated: processes.len(),
+        })
+    }
+    #[cfg(not(windows))]
+    {
+        Err("Environment snapshot currently supports Windows only.".into())
+    }
+}
+
+pub fn require_closed() -> Result<()> {
+    if !codex_processes()?.is_empty() {
+        return Err("Close Codex Desktop and all Codex CLI processes, then scan again. Use Close Codex processes if they remain in the background.".into());
+    }
+    Ok(())
 }
 
 pub fn locked_read(path: &Path) -> Result<File> {
@@ -197,7 +244,7 @@ fn classify(path: &str) -> Option<(&'static str, bool)> {
     {
         return Some(("settings", true));
     }
-    if path.starts_with("skills/") || path.starts_with("plugins/cache/") {
+    if path.starts_with("skills/") {
         return Some(("skills", false));
     }
     if path.starts_with("pets/") {
@@ -208,33 +255,35 @@ fn classify(path: &str) -> Option<(&'static str, bool)> {
 fn excluded_reason(path: &str) -> &'static str {
     if matches!(path, "auth.json" | "cap_sid" | "installation_id") || path.contains("credential") {
         "Authentication / machine identity: sign in again"
+    } else if path.starts_with("plugins/cache/")
+        || path.starts_with("cache/")
+        || path.starts_with("tmp/")
+        || path == "models_cache.json"
+    {
+        "Regenerable cache or temporary data"
     } else if path.starts_with("plugins/") {
-        "Plugin runtime / registry: reinstall and reconnect; installed cache retained with skills"
+        "Plugin runtime / registry: reinstall and reconnect"
     } else if path.starts_with("logs/")
         || path.starts_with("log/")
         || path.starts_with("logs_2.sqlite")
     {
         "Diagnostic logs, not recovery data"
-    } else if path.starts_with("tmp/") || path == "models_cache.json" {
-        "Regenerable runtime data"
     } else {
         "Outside supported scope / recovery artifacts / machine-specific data; source unchanged"
     }
 }
-fn walk(root: &Path, dir: &Path, files: &mut Vec<String>) -> Result<()> {
+fn walk(root: &Path, dir: &Path, files: &mut Vec<String>, skipped_links: &mut usize) -> Result<()> {
     fs_safety::check(dir)?;
     for entry in fs::read_dir(dir).map_err(|e| e.to_string())? {
         let entry = entry.map_err(|e| e.to_string())?;
         let path = entry.path();
         let m = fs::symlink_metadata(&path).map_err(|e| e.to_string())?;
         if fs_safety::linked(&m) {
-            return Err(format!(
-                "Link or junction excluded; resolve before snapshot: {}",
-                path.display()
-            ));
+            *skipped_links += 1;
+            continue;
         }
         if m.is_dir() {
-            walk(root, &path, files)?;
+            walk(root, &path, files, skipped_links)?;
         } else if m.is_file() {
             files.push(
                 path.strip_prefix(root)
@@ -254,7 +303,8 @@ fn inventory(home: &Path, groups: &[String]) -> Result<(Vec<Entry>, Vec<Group>)>
         return Err("Select valid component groups.".into());
     }
     let mut files = Vec::new();
-    walk(home, home, &mut files)?;
+    let mut skipped_links = 0;
+    walk(home, home, &mut files, &mut skipped_links)?;
     files.sort();
     let mut entries = Vec::new();
     let mut excluded: HashMap<String, Group> = HashMap::new();
@@ -321,6 +371,18 @@ fn inventory(home: &Path, groups: &[String]) -> Result<(Vec<Entry>, Vec<Group>)>
             g.files += 1;
             g.bytes += size;
         }
+    }
+    if skipped_links > 0 {
+        let reason = "Link or junction excluded for safe backup".to_owned();
+        excluded.insert(
+            reason.clone(),
+            Group {
+                id: reason.clone(),
+                files: skipped_links,
+                bytes: 0,
+                reason,
+            },
+        );
     }
     let mut excluded: Vec<_> = excluded.into_values().collect();
     excluded.sort_by(|a, b| a.id.cmp(&b.id));
@@ -648,6 +710,20 @@ mod tests {
         fs::write(home.join("config.toml"), "api_key='synthetic'").unwrap();
         fs::write(home.join("state_5.sqlite"), "synthetic db bytes").unwrap();
         fs::write(home.join("state_5.sqlite-wal"), "synthetic WAL").unwrap();
+        fs::create_dir_all(home.join("plugins/cache/openai-bundled")).unwrap();
+        fs::write(
+            home.join("plugins/cache/openai-bundled/manifest.json"),
+            "plugin cache",
+        )
+        .unwrap();
+        fs::create_dir_all(home.join("cache/remote_plugin_catalog")).unwrap();
+        fs::write(
+            home.join("cache/remote_plugin_catalog/catalog.json"),
+            "cache",
+        )
+        .unwrap();
+        fs::create_dir_all(home.join("tmp")).unwrap();
+        fs::write(home.join("tmp/temporary.txt"), "temporary").unwrap();
         (root, home, GROUPS.iter().map(|s| s.to_string()).collect())
     }
     #[test]
@@ -657,7 +733,15 @@ mod tests {
         assert!(!entries
             .iter()
             .any(|e| e.path == "auth.json" || e.path == "config.toml"));
+        assert!(!entries.iter().any(|e| {
+            e.path.starts_with("plugins/cache/")
+                || e.path.starts_with("cache/")
+                || e.path.starts_with("tmp/")
+        }));
         assert!(excluded.iter().any(|g| g.reason.contains("credentials")));
+        assert!(excluded
+            .iter()
+            .any(|g| g.reason == "Regenerable cache or temporary data"));
         assert!(entries.iter().any(|e| e.path.ends_with("-wal") && e.manual));
         let archive = create_at(&home, &root.join("out"), entries.clone(), &groups).unwrap();
         let archive = PathBuf::from(archive.archive_path);
@@ -700,6 +784,30 @@ mod tests {
         fs::remove_dir_all(root).unwrap();
     }
     #[test]
+    fn inventory_skips_windows_junctions() {
+        let (root, home, groups) = fixture();
+        #[cfg(windows)]
+        {
+            let link = home.join("plugins/cache/openai-bundled/chrome/latest");
+            let target = root.join("plugin-runtime");
+            fs::create_dir_all(link.parent().unwrap()).unwrap();
+            fs::create_dir_all(&target).unwrap();
+            fs::write(target.join("runtime.exe"), "not backed up").unwrap();
+            let status = std::process::Command::new("cmd")
+                .args(["/c", "mklink", "/J"])
+                .arg(link.to_string_lossy().replace('/', "\\"))
+                .arg(target.to_string_lossy().replace('/', "\\"))
+                .status()
+                .unwrap();
+            assert!(status.success());
+            let (_, excluded) = inventory(&home, &groups).unwrap();
+            assert!(excluded
+                .iter()
+                .any(|g| g.reason == "Link or junction excluded for safe backup"));
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
     fn archive_corruption_and_unsafe_components_are_rejected() {
         let (root, home, groups) = fixture();
         let entries = inventory(&home, &groups).unwrap().0;
@@ -728,5 +836,14 @@ mod tests {
         assert!(OpenOptions::new().write(true).open(&target).is_err());
         drop(input);
         fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn recognizes_only_supported_codex_processes() {
+        assert_eq!(
+            parse_codex_processes(
+                "\"Codex.exe\",\"101\"\n\"code.exe\",\"102\"\n\"codex-app-server.exe\",\"103\""
+            ),
+            ["codex.exe", "codex-app-server.exe"]
+        );
     }
 }

@@ -1,5 +1,83 @@
 # Implementation Plan — Personal application migration
 
+## 2026-10-05: ChatGPT project-local data in Codex migration
+
+- Detect `.chatgpt-projects` beneath supported `.codex` accounts. Its files
+  form one selected-by-default `projects` component and restore only to the
+  same nested folder below the matching destination account.
+- Keep the existing strict traversal, reparse-point exclusion, SHA-256 ZIP
+  validation, create-new restore and rollback. This includes local project
+  metadata, instructions and sources only; it cannot promise restoration of
+  cloud project state or transfer official CLI authentication.
+- Add focused native round-trip/estimate coverage and update the bilingual UI
+  scope text so a zero Worktrees row is not mistaken for ChatGPT Projects.
+- Preserve all other durable, non-credential account state in a separate
+  selected-by-default component. Exclude authentication, machine identity,
+  caches, temporary files, sandboxes, links, recovery artifacts and Git data.
+
+## 2026-10-05: Unified portable backup folder
+
+- Write new personal application bundles to the existing portable `backups/`
+  folder, shared with Codex migration ZIPs; do not introduce another archive
+  root.
+- When the SourceTree configuration archive list loads, move only legacy direct
+  regular `sourcetree-config-<timestamp>.zip` files from `backup/` to
+  `backups/`, after reparse-point checks. A name collision leaves the legacy
+  file untouched; there is no overwrite or arbitrary-file migration.
+- Treat a shared Dashboard directory as one inventory so file counts and sizes
+  are not doubled. Update portable documentation and release notes.
+
+## 2026-10-05: SourceTree configuration archive list
+
+- List only direct regular `sourcetree-config-<timestamp>.zip` files in the
+  Companion personal-bundle directory, newest first with total size. Do not
+  expose other personal bundles or arbitrary filesystem paths.
+- Allow Explorer reveal and deletion only after native filename, regular-file
+  and reparse-point validation; the UI asks for confirmation before delete and
+  refreshes the list afterwards.
+- Reuse the existing archive-list UI pattern and add a focused native scope
+  test. Update the guide and release notes.
+
+## 2026-10-04: SourceTree configuration recovery clarity
+
+- Keep the existing AES-256 bundle format, closed-SourceTree gate, strict
+  inspection, safety copy and rollback unchanged. Reduce the new-bundle
+  password policy from twelve to six characters at the native validation and
+  UI boundary, without saving the password anywhere.
+- Make the existing recovery stages visible: tell the user when the selected
+  ZIP is being read, place the preview action above the inspected file list,
+  then expose the explicit `RESTORE` action after preview. An old unencrypted
+  bundle may still use an empty password.
+- Add focused checks for the six-character boundary and the recovery controls;
+  run the focused Rust test, frontend checks/tests, lint, build and whitespace
+  check. A real SourceTree restore remains a target-machine manual check.
+
+## 2026-10-05: SourceTree restore evidence
+
+- Keep the existing direct allowlist and safety-copy/rollback flow. After each
+  replacement, compare the destination SHA-256 and byte count to the inspected
+  bundle manifest; any mismatch rolls back the already-written targets.
+- Return the verified destination of every restored file so the UI can show
+  the exact files applied, including `bookmarks.xml`, `opentabs.xml`, `passwd`,
+  and `userhosts`. Do not expose file contents.
+
+## 2026-10-04: Replace Codex chat snapshot and restore feedback
+
+- Keep the existing create-only restore as the default. Add one explicit
+  replace-chat mode; it never attempts to compare timestamps or merge SQLite.
+- When selected, require Codex to be closed, snapshot only the target's
+  allowlisted chat files into a verified safety ZIP (never auth or machine
+  identity), then replace the complete selected chat snapshot including SQLite
+  WAL/SHM and sessions. A failed replacement removes new files and restores the
+  safety ZIP.
+- Show an in-progress state while a migration ZIP is chosen/validated and
+  while the restore preview is built. Keep restore controls above a bounded,
+  scrollable file list so a large archive cannot hide the action.
+- Add focused native replacement/rollback coverage and extend the page test;
+  run TypeScript, lint, frontend tests, focused Rust tests, and whitespace
+  checks. A target-machine Desktop history check remains required before this
+  mode can be claimed as a verified Desktop migration.
+
 ## 2026-10-04: Multi-account Codex migration
 
 - Add one concrete `codex_migration.rs` workflow under the Codex navigation

@@ -12,18 +12,17 @@ Codex environment archives cover selected local files with SHA-256 verification,
 
 Temporary cleanup is on-demand and limited to the verified remote plugin catalog cache. Installed plugin resources are protected. Session v1 and existing delete safety archives remain readable.
 
-Personal bundles are concrete Windows-only workflows: an opaque user-exported Beyond Compare `.bcpkg`, SourceTree bookmarks and an optional AES-256 encrypted full local-configuration bundle, and explicitly selected XAMPP `htdocs` projects plus reviewed text configuration. Recovery stages files for manual placement or import and never overwrites existing data.
+Personal bundles are concrete Windows-only workflows: an opaque user-exported Beyond Compare `.bcpkg`, SourceTree bookmarks and an optional AES-256 encrypted full local-configuration bundle, and explicitly selected XAMPP `htdocs` projects plus reviewed text configuration. Beyond Compare, bookmark and XAMPP recovery stage files for manual placement or import; the separately confirmed SourceTree configuration restore replaces its allowlisted local files only after a safety copy and hash verification.
 
 See [User guide](docs/USER_GUIDE.md), [storage inventory and limitations](docs/STORAGE_AUDIT.md), [build instructions](BUILD.md), [development and debugging](docs/DEVELOPMENT.md), [debug notes](docs/DEBUG_NOTES.md), and [validation](docs/VALIDATION.md).
 
 ## Quick start
 
 For a built portable copy, keep the full `release/portable` folder together and
-run `dev-companion.exe`. Keep `portable-mode` beside the executable. Personal
-application bundles are stored in its adjacent `backup/` folder, so they travel
-with the portable folder. The Dashboard is the first navigation item and shows
-the current feature summary plus a read-only inventory of `backup/` and
-`backups/`.
+run `dev-companion.exe`. Keep `portable-mode` beside the executable. Codex
+migration ZIPs and personal application bundles share its adjacent `backups/`
+folder, so they travel with the portable folder. The Dashboard is the first
+navigation item and shows one read-only inventory of that folder.
 
 To develop locally on Windows, install Node.js, pnpm, Rust stable, Visual
 Studio C++ Build Tools, and WebView2, then run:

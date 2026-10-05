@@ -24,14 +24,20 @@ Release/version: 0.2.0
   marker-preserving global `AGENTS.md` management. It never persists or reads
   authentication credentials; removing metadata never deletes `CODEX_HOME`.
 - Codex Migration: scans the current user's direct `.codex` and `.codex-*`
-  accounts, creates one strict SHA-256 ZIP with selected per-account content,
-  and restores only missing files into matching account folders. Chat/local
-  databases, safe settings, skills and pets are recommended; worktrees,
-  plugins and visualizations are opt-in. Authentication, machine identity,
-  runtime caches and sandboxes are always excluded. Component and selected
-  backup-total estimates are calculated from current source metadata. The
-  module lists its own ZIPs with timestamps and sizes, can reveal one in
-  Explorer, and deletes only a confirmed, direct regular migration ZIP.
+  accounts, creates one strict SHA-256 ZIP with selected account,
+  `.chatgpt-projects` project-local and other durable-state content,
+  and restores only missing files into matching account folders by default.
+  An explicit replace-chat mode creates a verified target safety ZIP, then
+  replaces the complete allowlisted chat snapshot; it never merges SQLite or
+  compares file timestamps. Chat/local databases, safe settings, skills and
+  pets, local ChatGPT project data, other durable state, worktrees, plugins and
+  visualizations are selected by default. Local project files do not guarantee
+  cloud-project state restoration.
+  Authentication, machine identity, runtime caches and sandboxes are always
+  excluded. Component and selected backup-total estimates are calculated from
+  current source metadata. The module lists its own ZIPs with timestamps and
+  sizes, can reveal one in Explorer, and deletes only a confirmed, direct
+  regular migration ZIP.
 - File Transfer: direct Windows Robocopy Simple/Fast/Project Migration/Mirror
   workflows with navigable Source/Destination direct-child views, safe source
   selection, hidden/system icon/color legend, preview, confirmations, dry-run,
@@ -51,13 +57,16 @@ Release/version: 0.2.0
 - SourceTree personal configuration: a sensitive closed-app AES-256 bundle
   includes detected `accounts.json`, `bookmarks.xml`, `customactions.xml`,
   `hostedaccounts.xml`, `opentabs.xml`, `passwd`, `userhosts`, and the current
-  `user.config`; direct restore needs `RESTORE`, takes a safety copy, and
-  exposes a post-restore `DELETE` action. Windows Vault, OAuth/DPAPI-bound
+  `user.config`; direct restore needs `RESTORE`, takes a safety copy, verifies
+  every replaced target against its bundled SHA-256, and exposes a post-restore
+  `DELETE` action. Its managed bundle list shows only
+  matching configuration ZIPs and allows confirmed deletion. Windows Vault, OAuth/DPAPI-bound
   secrets and SSH keys remain excluded, so target-machine sign-in may still be
   required.
-- Portable personal bundles are written to `backup/` beside `dev-companion.exe`
-  when the adjacent `portable-mode` marker is present; installed builds retain
-  the existing AppData location.
+- Portable personal bundles and Codex migration ZIPs share `backups/` beside
+  `dev-companion.exe` when the adjacent `portable-mode` marker is present;
+  installed builds retain the existing AppData location. SourceTree moves only
+  validated legacy configuration ZIPs from `backup/` without overwriting.
 - Dashboard is the first navigation group and shows current local feature
   counts plus read-only direct-file inventories for session backups and
   personal application bundles.

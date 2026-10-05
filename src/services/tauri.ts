@@ -34,6 +34,10 @@ export const recoverSourceTree = (token: string, confirmation: string): Promise<
 export const previewSourceTreeConfig = (): Promise<import("../types/codex").SourceTreeConfigPreview> => invoke("preview_sourcetree_config");
 export const createSourceTreeConfigBundle = (token: string, password: string): Promise<{ bundleName: string; bundlePath: string; bytes: number }> => invoke("create_sourcetree_config_bundle", { token, password });
 export const openSourceTreeConfigBundleFolder = (): Promise<void> => invoke("open_sourcetree_config_bundle_folder");
+export const listSourceTreeConfigArchives = (): Promise<import("../types/codex").SourceTreeConfigArchives> => invoke("list_sourcetree_config_archives");
+export const openSourceTreeConfigArchive = (name: string): Promise<void> => invoke("open_sourcetree_config_archive", { name });
+export const deleteSourceTreeConfigArchive = (name: string): Promise<void> => invoke("delete_sourcetree_config_archive", { name });
+export const inspectSourceTreeConfigArchive = (name: string, password: string): Promise<import("../types/codex").SourceTreeConfigInspection> => invoke("inspect_sourcetree_config_archive", { name, password });
 export const inspectSourceTreeConfigBundle = (password: string): Promise<import("../types/codex").SourceTreeConfigInspection | null> => invoke("inspect_sourcetree_config_bundle", { password });
 export const previewSourceTreeConfigRecovery = (token: string, password: string): Promise<import("../types/codex").SourceTreeConfigRecoveryPreview> => invoke("preview_sourcetree_config_recovery", { token, password });
 export const recoverSourceTreeConfig = (token: string, confirmation: string, password: string): Promise<import("../types/codex").SourceTreeConfigRecoveryResult> => invoke("recover_sourcetree_config", { token, confirmation, password });
@@ -64,9 +68,11 @@ export const createCodexMigration = (token: string): Promise<CodexMigrationCreat
 export const listCodexMigrationArchives = (): Promise<CodexMigrationArchives> => invoke("list_codex_migration_archives");
 export const openCodexMigrationArchive = (name: string): Promise<void> => invoke("open_codex_migration_archive", { name });
 export const deleteCodexMigrationArchive = (name: string): Promise<void> => invoke("delete_codex_migration_archive", { name });
+export const inspectCodexMigrationArchive = (name: string): Promise<CodexMigrationPreview> => invoke("inspect_codex_migration_archive", { name });
 export const inspectCodexMigration = (): Promise<CodexMigrationPreview | null> => invoke("inspect_codex_migration");
 export const previewCodexMigrationRestore = (token: string): Promise<CodexMigrationRestorePreview> => invoke("preview_codex_migration_restore", { token });
-export const restoreCodexMigration = (token: string, confirmation: string): Promise<CodexMigrationRestored> => invoke("restore_codex_migration", { token, confirmation });
+export const restoreCodexMigration = (token: string, confirmation: string, replaceChat: boolean): Promise<CodexMigrationRestored> => invoke("restore_codex_migration", { token, confirmation, replaceChat });
+export const stopCodexProcesses = (): Promise<import("../types/codex").CodexProcessResult> => invoke("stop_codex_processes", { confirmation: "CLOSE CODEX" });
 export const getFileTransferReadiness = (): Promise<FileTransferReadiness> => invoke("get_file_transfer_readiness");
 export const listFileTransferDirectory = (path: string): Promise<FileTransferDirectoryListing> => invoke("list_file_transfer_directory", { path });
 const fileTransferPayload = (config: FileTransferConfig): FileTransferConfig => ({ ...config, includeSubfolders: config.includeSubfolders === true, preserveTimestamps: config.preserveTimestamps === true, skipJunctionPoints: config.skipJunctionPoints === true, restartable: config.restartable === true, copyEmptyDirectories: config.copyEmptyDirectories === true, verifyDestination: config.verifyDestination === true, saveLog: config.saveLog === true, shutdownWhenFinished: config.shutdownWhenFinished === true, selectionEnabled: config.selectionEnabled === true, mirrorConfirmed: config.mirrorConfirmed === true, systemLocationConfirmed: config.systemLocationConfirmed === true, destinationDataConfirmed: config.destinationDataConfirmed === true });

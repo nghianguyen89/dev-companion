@@ -100,7 +100,7 @@ export interface CodexEnvironmentOverview {
 }
 export interface CodexEnvironmentInstructions { content: string; managed: boolean; }
 export interface CodexEnvironmentActionResult { message: string; }
-export type CodexMigrationGroup = "chat" | "settings" | "skills" | "pets" | "worktrees" | "plugins" | "visualizations";
+export type CodexMigrationGroup = "chat" | "settings" | "skills" | "pets" | "projects" | "state" | "worktrees" | "plugins" | "visualizations";
 export interface CodexMigrationAccount { id: string; label: string; folder: string; }
 export interface CodexMigrationEntry { accountId: string; relativePath: string; archivePath: string; group: CodexMigrationGroup; bytes: number; sha256: string; }
 export interface CodexMigrationGroupSummary { id: string; files: number; bytes: number; reason: string; }
@@ -111,7 +111,8 @@ export interface CodexMigrationCreated { archivePath: string; archiveBytes: numb
 export interface CodexMigrationArchive { name: string; bytes: number; modifiedAt: number | null; }
 export interface CodexMigrationArchives { directory: string; archives: CodexMigrationArchive[]; totalBytes: number; }
 export interface CodexMigrationRestorePreview { token: string; items: Array<{ accountLabel: string; path: string; archivePath: string; status: "new" | "identical" | "conflict"; bytes: number }>; }
-export interface CodexMigrationRestored { restored: number; skipped: number; errors: string[]; rollbackRemaining: number; }
+export interface CodexMigrationRestored { restored: number; skipped: number; errors: string[]; rollbackRemaining: number; safetyArchive: string | null; }
+export interface CodexProcessResult { terminated: number; }
 
 export type ConversationDiscoveryStatus = "ready" | "codexHomeMissing" | "sessionDirectoryMissing" | "permissionDenied" | "filesystemUnavailable";
 
@@ -159,7 +160,10 @@ export interface SourceTreeConfigFile { name: string; bytes: number; }
 export interface SourceTreeConfigPreview { token: string; files: SourceTreeConfigFile[]; missing: string[]; bytes: number; sensitive: boolean; }
 export interface SourceTreeConfigInspection { token: string; bundleName: string; files: SourceTreeConfigFile[]; bytes: number; sensitive: boolean; }
 export interface SourceTreeConfigRecoveryPreview { token: string; files: SourceTreeConfigFile[]; existingTargets: number; }
-export interface SourceTreeConfigRecoveryResult { restored: number; safetyCopyPath: string; }
+export interface SourceTreeConfigRestoredFile extends SourceTreeConfigFile { destination: string; }
+export interface SourceTreeConfigRecoveryResult { restored: number; safetyCopyPath: string; files: SourceTreeConfigRestoredFile[]; }
+export interface SourceTreeConfigArchive { name: string; bytes: number; modifiedAt: number | null; }
+export interface SourceTreeConfigArchives { archives: SourceTreeConfigArchive[]; totalBytes: number; }
 export interface XamppReadiness { supported: boolean; installationFound: boolean; stopped: boolean; }
 export interface XamppPreview { token: string; sourceAppVersion: string; architecture: string; projects: string[]; configFiles: string[]; fileCount: number; bytes: number; excludedCount: number; sensitive: boolean; }
 export interface XamppInspection { token: string; bundleName: string; createdAt: string; sourceAppVersion: string; architecture: string; projects: string[]; fileCount: number; bytes: number; sensitive: boolean; }

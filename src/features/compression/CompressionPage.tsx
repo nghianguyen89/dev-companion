@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { cancelCompression, getCompressionReadiness, pickCompressionFolder, previewCompression, scanCompressionSource, startCompression } from "../../services/tauri";
 import type { CompressionCommandPreview, CompressionCompletion, CompressionConfig, CompressionOutput, CompressionProgress, CompressionReadiness, CompressionSourceTree } from "../../types/codex";
 import { useTranslation } from "../../i18n";
+import { defaultCompressionExcludedPaths } from "./CompressionDefaults";
 import "./CompressionPage.css";
 
 const initial: CompressionConfig = { source: "", outputFolder: "", mode: "fast", excludedPaths: [], regexExclusions: [] };
@@ -64,7 +65,7 @@ export function CompressionPage() {
       setConfig({ ...initial, source: path, outputFolder: "" });
       const next = await scanCompressionSource(path);
       setTree(next);
-      setConfig({ ...initial, source: next.source, outputFolder: next.defaultOutputFolder });
+      setConfig({ ...initial, source: next.source, outputFolder: next.defaultOutputFolder, excludedPaths: defaultCompressionExcludedPaths(next.entries) });
       setPatterns("");
       setPreview(null);
       setCompletion(null);

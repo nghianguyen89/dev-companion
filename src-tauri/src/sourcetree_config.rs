@@ -1,5 +1,6 @@
 //! Explicit SourceTree configuration bundle. Windows Vault and SSH credentials stay out of scope.
 use std::{
+    cmp::Reverse,
     collections::{HashMap, HashSet},
     fs::{self, File, OpenOptions},
     io::{Read, Seek, Write},
@@ -9,6 +10,7 @@ use std::{
         atomic::{AtomicU64, Ordering},
         Mutex, OnceLock,
     },
+    time::UNIX_EPOCH,
 };
 
 use serde::{Deserialize, Serialize};
@@ -75,6 +77,27 @@ pub struct RecoveryPreview {
 pub struct RecoveryResult {
     pub restored: u32,
     pub safety_copy_path: String,
+    pub files: Vec<RestoredFile>,
+}
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RestoredFile {
+    pub name: String,
+    pub destination: String,
+    pub bytes: u64,
+}
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Archive {
+    pub name: String,
+    pub bytes: u64,
+    pub modified_at: Option<u64>,
+}
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Archives {
+    pub archives: Vec<Archive>,
+    pub total_bytes: u64,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -178,30 +201,60 @@ fn local_atlassian() -> Result<PathBuf> {
         .map(|path| path.join("Atlassian"))
         .ok_or_else(|| "Cannot locate Windows LocalAppData.".into())
 }
+fn roaming_atlassian() -> Result<PathBuf> {
+    std::env::var_os("APPDATA")
+        .map(PathBuf::from)
+        .map(|path| path.join("Atlassian"))
+        .ok_or_else(|| "Cannot locate Windows AppData.".into())
+}
+fn config_activity(root: &Path) -> Option<std::time::SystemTime> {
+    CONFIG_FILES
+        .iter()
+        .filter_map(|(_, relative)| fs::metadata(root.join("SourceTree").join(relative)).ok())
+        .filter_map(|metadata| metadata.modified().ok())
+        .max()
+}
+fn config_root_at(local: &Path, roaming: &Path) -> PathBuf {
+    match (config_activity(local), config_activity(roaming)) {
+        (Some(local_time), Some(roaming_time)) if roaming_time >= local_time => {
+            roaming.join("SourceTree")
+        }
+        (Some(_), Some(_)) | (Some(_), None) | (None, None) => local.join("SourceTree"),
+        (None, Some(_)) => roaming.join("SourceTree"),
+    }
+}
 fn config_root() -> Result<PathBuf> {
-    Ok(local_atlassian()?.join("SourceTree"))
+    Ok(config_root_at(&local_atlassian()?, &roaming_atlassian()?))
 }
 fn user_config() -> Option<(PathBuf, String)> {
-    let root = local_atlassian().ok()?;
+    let roots = [local_atlassian().ok()?, roaming_atlassian().ok()?];
     let mut candidates = Vec::new();
-    for app in fs::read_dir(&root).ok()?.flatten() {
-        let name = app.file_name().to_string_lossy().into_owned();
-        if !name.starts_with("SourceTree.exe_Url_") || fs_safety::check(&app.path()).is_err() {
+    for root in roots {
+        let Ok(apps) = fs::read_dir(&root) else {
             continue;
-        }
-        for version in fs::read_dir(app.path()).ok()?.flatten() {
-            let path = version.path().join("user.config");
-            if let Ok(metadata) = fs::symlink_metadata(&path) {
-                if metadata.is_file() && !fs_safety::linked(&metadata) {
-                    candidates.push((
-                        metadata.modified().ok(),
-                        path,
-                        format!(
-                            "{}/{}/user.config",
-                            name,
-                            version.file_name().to_string_lossy()
-                        ),
-                    ));
+        };
+        for app in apps.flatten() {
+            let name = app.file_name().to_string_lossy().into_owned();
+            if !name.starts_with("SourceTree.exe_Url_") || fs_safety::check(&app.path()).is_err() {
+                continue;
+            }
+            let Ok(versions) = fs::read_dir(app.path()) else {
+                continue;
+            };
+            for version in versions.flatten() {
+                let path = version.path().join("user.config");
+                if let Ok(metadata) = fs::symlink_metadata(&path) {
+                    if metadata.is_file() && !fs_safety::linked(&metadata) {
+                        candidates.push((
+                            metadata.modified().ok(),
+                            path,
+                            format!(
+                                "{}/{}/user.config",
+                                name,
+                                version.file_name().to_string_lossy()
+                            ),
+                        ));
+                    }
                 }
             }
         }
@@ -316,8 +369,8 @@ fn validate(bundle: &Bundle) -> Result<()> {
     Ok(())
 }
 fn validate_password(password: &str) -> Result<()> {
-    if password.chars().count() < 12 {
-        return Err("Use a bundle password of at least 12 characters.".into());
+    if password.chars().count() < 6 {
+        return Err("Use a bundle password of at least 6 characters.".into());
     }
     Ok(())
 }
@@ -441,6 +494,119 @@ pub fn open_bundle_folder() -> Result<()> {
         .map(|_| ())
         .map_err(|_| "Cannot open the SourceTree bundle folder.".into())
 }
+fn archive_name(name: &str) -> bool {
+    name.strip_prefix("sourcetree-config-")
+        .and_then(|value| value.strip_suffix(".zip"))
+        .is_some_and(|stamp| !stamp.is_empty() && stamp.bytes().all(|byte| byte.is_ascii_digit()))
+}
+fn archive_path_at(directory: &Path, name: &str) -> Result<PathBuf> {
+    if !archive_name(name) {
+        return Err("Unknown SourceTree configuration bundle.".into());
+    }
+    fs_safety::check(directory)?;
+    let path = directory.join(name);
+    fs_safety::check(&path)?;
+    let metadata = fs::symlink_metadata(&path)
+        .map_err(|_| "SourceTree configuration bundle is unavailable.")?;
+    if fs_safety::linked(&metadata) || !metadata.is_file() {
+        return Err("SourceTree configuration bundle is not a regular file.".into());
+    }
+    Ok(path)
+}
+fn list_archives_at(directory: &Path) -> Result<Archives> {
+    fs_safety::check(directory)?;
+    if !directory.exists() {
+        return Ok(Archives {
+            archives: Vec::new(),
+            total_bytes: 0,
+        });
+    }
+    let mut archives = Vec::new();
+    for entry in fs::read_dir(directory).map_err(|error| error.to_string())? {
+        let entry = entry.map_err(|error| error.to_string())?;
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if !archive_name(&name) {
+            continue;
+        }
+        let metadata = fs::symlink_metadata(entry.path()).map_err(|error| error.to_string())?;
+        if fs_safety::linked(&metadata) || !metadata.is_file() {
+            continue;
+        }
+        archives.push(Archive {
+            name,
+            bytes: metadata.len(),
+            modified_at: metadata
+                .modified()
+                .ok()
+                .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+                .map(|duration| duration.as_secs()),
+        });
+    }
+    archives.sort_by_key(|archive| Reverse(archive.modified_at.unwrap_or_default()));
+    let total_bytes = archives.iter().map(|archive| archive.bytes).sum();
+    Ok(Archives {
+        archives,
+        total_bytes,
+    })
+}
+
+fn migrate_legacy_archives_at(legacy: &Path, destination: &Path) -> Result<()> {
+    fs_safety::check(legacy)?;
+    fs_safety::check(destination)?;
+    if !legacy.is_dir() {
+        return Ok(());
+    }
+    fs::create_dir_all(destination).map_err(|_| "Cannot create the Companion bundle folder.")?;
+    for entry in fs::read_dir(legacy).map_err(|error| error.to_string())? {
+        let entry = entry.map_err(|error| error.to_string())?;
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if !archive_name(&name) {
+            continue;
+        }
+        let source = entry.path();
+        let metadata = fs::symlink_metadata(&source).map_err(|error| error.to_string())?;
+        if fs_safety::linked(&metadata) || !metadata.is_file() {
+            continue;
+        }
+        let target = destination.join(&name);
+        fs_safety::check(&target)?;
+        if target.exists() {
+            continue;
+        }
+        fs::rename(source, target)
+            .map_err(|_| "Cannot move the legacy SourceTree configuration bundle.")?;
+    }
+    Ok(())
+}
+pub fn list_archives() -> Result<Archives> {
+    let directory = platform::personal_bundle_dir();
+    if let Some(legacy) = platform::legacy_personal_bundle_dir() {
+        migrate_legacy_archives_at(&legacy, &directory)?;
+    }
+    list_archives_at(&directory)
+}
+pub fn open_archive(name: &str) -> Result<()> {
+    let path = archive_path_at(&platform::personal_bundle_dir(), name)?;
+    Command::new("explorer.exe")
+        .arg(format!("/select,{}", path.display()))
+        .spawn()
+        .map(|_| ())
+        .map_err(|_| "Cannot open the SourceTree configuration bundle folder.".into())
+}
+fn delete_archive_at(directory: &Path, name: &str) -> Result<()> {
+    let path = archive_path_at(directory, name)?;
+    fs::remove_file(path).map_err(|_| "Cannot remove SourceTree configuration bundle.")?;
+    Ok(())
+}
+pub fn delete_archive(name: &str) -> Result<()> {
+    delete_archive_at(&platform::personal_bundle_dir(), name)
+}
+pub fn inspect_archive(name: &str, password: &str) -> Result<Inspection> {
+    inspect(
+        archive_path_at(&platform::personal_bundle_dir(), name)?,
+        password,
+    )
+}
 fn read_bundle(path: &Path, password: &str) -> Result<Bundle> {
     fs_safety::check(path)?;
     let hash = bundle_hash(path)?;
@@ -525,8 +691,7 @@ pub fn inspect(path: PathBuf, password: &str) -> Result<Inspection> {
         sensitive: true,
     })
 }
-fn targets(bundle: &Bundle) -> Result<Vec<(Entry, PathBuf)>> {
-    let root = local_atlassian()?;
+fn targets_at(root: &Path, bundle: &Bundle) -> Result<Vec<(Entry, PathBuf)>> {
     bundle
         .files
         .iter()
@@ -541,6 +706,22 @@ fn targets(bundle: &Bundle) -> Result<Vec<(Entry, PathBuf)>> {
             Ok((entry, target))
         })
         .collect()
+}
+fn targets(bundle: &Bundle) -> Result<Vec<(Entry, PathBuf)>> {
+    let root = config_root()?;
+    let atlassian = root
+        .parent()
+        .ok_or("Invalid SourceTree configuration root.")?;
+    let mut targets = targets_at(atlassian, bundle)?;
+    if let Some((path, _)) = user_config() {
+        for (entry, target) in &mut targets {
+            if entry.name == "user.config" {
+                *target = path.clone();
+                fs_safety::check(target)?;
+            }
+        }
+    }
+    Ok(targets)
 }
 pub fn preview_recovery(token: &str, password: &str) -> Result<RecoveryPreview> {
     sourcetree::require_closed()?;
@@ -584,6 +765,7 @@ pub fn recover(token: &str, confirmation: &str, password: &str) -> Result<Recove
     let mut archive =
         ZipArchive::new(file).map_err(|_| "Invalid SourceTree configuration bundle.")?;
     let mut written: Vec<(PathBuf, Option<PathBuf>)> = Vec::new();
+    let mut restored_files = Vec::new();
     let result = (|| -> Result<()> {
         for (entry, target) in targets {
             let backup = if target.exists() {
@@ -616,6 +798,14 @@ pub fn recover(token: &str, confirmation: &str, password: &str) -> Result<Recove
                 fs::remove_file(&target).map_err(|_| "Cannot replace SourceTree configuration.")?;
             }
             fs::rename(&temporary, &target).map_err(|_| "Cannot finalize SourceTree restore.")?;
+            if hash_file(&target)? != (entry.sha256.clone(), entry.bytes) {
+                return Err("SourceTree restore verification failed.".into());
+            }
+            restored_files.push(RestoredFile {
+                name: entry.name,
+                destination: target.display().to_string(),
+                bytes: entry.bytes,
+            });
         }
         Ok(())
     })();
@@ -631,6 +821,7 @@ pub fn recover(token: &str, confirmation: &str, password: &str) -> Result<Recove
     Ok(RecoveryResult {
         restored: bundle.files.len() as u32,
         safety_copy_path: safety.display().to_string(),
+        files: restored_files,
     })
 }
 pub fn delete(token: &str, confirmation: &str) -> Result<()> {
@@ -689,6 +880,62 @@ mod tests {
     }
 
     #[test]
+    fn bundle_password_requires_six_characters() {
+        assert!(validate_password("12345").is_err());
+        assert!(validate_password("123456").is_ok());
+    }
+
+    #[test]
+    fn archive_list_and_delete_are_scoped_to_configuration_zips() {
+        let root = std::env::temp_dir().join(format!(
+            "companion-sourcetree-config-archives-{}",
+            time::OffsetDateTime::now_utc().unix_timestamp_nanos()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let archive = "sourcetree-config-123.zip";
+        fs::write(root.join(archive), "configuration").unwrap();
+        fs::write(root.join("sourcetree-bookmarks-123.zip"), "other").unwrap();
+        let archives = list_archives_at(&root).unwrap();
+        assert_eq!(archives.archives.len(), 1);
+        assert_eq!(archives.archives[0].name, archive);
+        assert!(delete_archive_at(&root, archive).is_ok());
+        assert!(!root.join(archive).exists());
+        assert!(root.join("sourcetree-bookmarks-123.zip").exists());
+        assert!(delete_archive_at(&root, "../sourcetree-bookmarks-123.zip").is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn legacy_configuration_archives_move_without_overwriting() {
+        let root = std::env::temp_dir().join(format!(
+            "companion-sourcetree-config-legacy-{}",
+            time::OffsetDateTime::now_utc().unix_timestamp_nanos()
+        ));
+        let legacy = root.join("backup");
+        let destination = root.join("backups");
+        fs::create_dir_all(&legacy).unwrap();
+        fs::write(legacy.join("sourcetree-config-123.zip"), "move").unwrap();
+        fs::write(legacy.join("sourcetree-config-456.zip"), "legacy").unwrap();
+        fs::create_dir_all(&destination).unwrap();
+        fs::write(destination.join("sourcetree-config-456.zip"), "current").unwrap();
+        fs::write(legacy.join("sourcetree-bookmarks-123.zip"), "other").unwrap();
+
+        migrate_legacy_archives_at(&legacy, &destination).unwrap();
+
+        assert_eq!(
+            fs::read(destination.join("sourcetree-config-123.zip")).unwrap(),
+            b"move"
+        );
+        assert_eq!(
+            fs::read(destination.join("sourcetree-config-456.zip")).unwrap(),
+            b"current"
+        );
+        assert!(legacy.join("sourcetree-config-456.zip").exists());
+        assert!(legacy.join("sourcetree-bookmarks-123.zip").exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn full_allowlist_is_only_available_to_encrypted_bundles() {
         let entry = Entry {
             name: "passwd".into(),
@@ -710,5 +957,63 @@ mod tests {
         legacy.format_version = 1;
         legacy.encryption = None;
         assert!(validate(&legacy).is_err());
+    }
+
+    #[test]
+    fn primary_sourcetree_files_target_the_active_configuration_root() {
+        let root = std::env::temp_dir().join(format!(
+            "companion-sourcetree-config-targets-{}",
+            time::OffsetDateTime::now_utc().unix_timestamp_nanos()
+        ));
+        fs::create_dir_all(root.join("SourceTree")).unwrap();
+        let bundle = Bundle {
+            format_version: 2,
+            kind: "dev-companion-sourcetree-config".into(),
+            created_at: "2026-10-03T00:00:00Z".into(),
+            sensitive: true,
+            encryption: Some("aes-256".into()),
+            files: ["bookmarks.xml", "opentabs.xml", "passwd", "userhosts"]
+                .into_iter()
+                .map(|name| Entry {
+                    name: name.into(),
+                    archive_path: format!("{ROOT}{name}"),
+                    destination: name.into(),
+                    bytes: 1,
+                    sha256: "0".repeat(64),
+                })
+                .collect(),
+        };
+
+        let restored = targets_at(&root, &bundle).unwrap();
+
+        assert_eq!(
+            restored
+                .iter()
+                .map(|(_, path)| path.strip_prefix(&root).unwrap().to_path_buf())
+                .collect::<Vec<_>>(),
+            [
+                PathBuf::from("SourceTree/bookmarks.xml"),
+                PathBuf::from("SourceTree/opentabs.xml"),
+                PathBuf::from("SourceTree/passwd"),
+                PathBuf::from("SourceTree/userhosts"),
+            ]
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn uses_roaming_configuration_when_it_is_the_active_profile() {
+        let root = std::env::temp_dir().join(format!(
+            "companion-sourcetree-config-roaming-{}",
+            time::OffsetDateTime::now_utc().unix_timestamp_nanos()
+        ));
+        let local = root.join("local");
+        let roaming = root.join("roaming");
+        fs::create_dir_all(roaming.join("SourceTree")).unwrap();
+        fs::write(roaming.join("SourceTree/bookmarks.xml"), "bookmarks").unwrap();
+
+        assert_eq!(config_root_at(&local, &roaming), roaming.join("SourceTree"));
+
+        fs::remove_dir_all(root).unwrap();
     }
 }

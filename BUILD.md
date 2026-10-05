@@ -18,9 +18,8 @@ Keep the complete `release/portable` folder writable and together when moving it
 
 - `portable-mode` enables portable storage discovery.
 - `config/`, `backups/`, and `quarantine/` are used when portable mode is
-  enabled in Settings.
-- `backup/` holds personal application bundles whenever the marker exists,
-  including encrypted SourceTree configuration bundles.
+  enabled in Settings. `backups/` holds both Codex migration ZIPs and personal
+  application bundles, including encrypted SourceTree configuration bundles.
 
 ## Debug a local build
 

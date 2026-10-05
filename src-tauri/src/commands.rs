@@ -286,6 +286,26 @@ pub async fn open_sourcetree_config_bundle_folder() -> Result<(), String> {
     run_blocking(crate::sourcetree_config::open_bundle_folder).await?
 }
 #[tauri::command]
+pub async fn list_sourcetree_config_archives() -> Result<crate::sourcetree_config::Archives, String>
+{
+    run_blocking(crate::sourcetree_config::list_archives).await?
+}
+#[tauri::command]
+pub async fn open_sourcetree_config_archive(name: String) -> Result<(), String> {
+    run_blocking(move || crate::sourcetree_config::open_archive(&name)).await?
+}
+#[tauri::command]
+pub async fn delete_sourcetree_config_archive(name: String) -> Result<(), String> {
+    run_blocking(move || crate::sourcetree_config::delete_archive(&name)).await?
+}
+#[tauri::command]
+pub async fn inspect_sourcetree_config_archive(
+    name: String,
+    password: String,
+) -> Result<crate::sourcetree_config::Inspection, String> {
+    run_blocking(move || crate::sourcetree_config::inspect_archive(&name, &password)).await?
+}
+#[tauri::command]
 pub async fn inspect_sourcetree_config_bundle(
     app: tauri::AppHandle,
     password: String,
@@ -542,6 +562,12 @@ pub async fn delete_codex_migration_archive(name: String) -> Result<(), String> 
     run_blocking(move || crate::codex_migration::delete_archive(&name)).await?
 }
 #[tauri::command]
+pub async fn inspect_codex_migration_archive(
+    name: String,
+) -> Result<crate::codex_migration::Preview, String> {
+    run_blocking(move || crate::codex_migration::inspect_archive(&name)).await?
+}
+#[tauri::command]
 pub async fn inspect_codex_migration(
     app: tauri::AppHandle,
 ) -> Result<Option<crate::codex_migration::Preview>, String> {
@@ -569,8 +595,16 @@ pub async fn preview_codex_migration_restore(
 pub async fn restore_codex_migration(
     token: String,
     confirmation: String,
+    replace_chat: bool,
 ) -> Result<crate::codex_migration::Restored, String> {
-    run_blocking(move || crate::codex_migration::restore(&token, &confirmation)).await?
+    run_blocking(move || crate::codex_migration::restore(&token, &confirmation, replace_chat))
+        .await?
+}
+#[tauri::command]
+pub async fn stop_codex_processes(
+    confirmation: String,
+) -> Result<crate::environment::CodexProcessResult, String> {
+    run_blocking(move || crate::environment::stop_codex_processes(&confirmation)).await?
 }
 #[tauri::command]
 pub async fn scan_cleanup() -> Result<crate::cleanup::Scan, String> {

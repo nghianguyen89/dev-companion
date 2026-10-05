@@ -5,8 +5,9 @@
 Dev Companion hiện hỗ trợ các workflow Windows cụ thể: archive môi trường Codex,
 bundle `.bcpkg` do Beyond Compare xuất, bookmark/cấu hình cục bộ SourceTree,
 và project/config được chọn của XAMPP. Bundle cá nhân luôn được coi
-là dữ liệu nhạy cảm; phục hồi chỉ đưa file vào staging của Companion để bạn tự
-đặt hoặc import.
+là dữ liệu nhạy cảm; Beyond Compare, bookmark SourceTree và XAMPP chỉ phục hồi
+vào staging để bạn tự đặt hoặc import. Cấu hình SourceTree là ngoại lệ có kiểm
+tra: chỉ được ghi sau khi xác nhận và tạo bản sao an toàn.
 
 ## Hướng dẫn và Thông tin trong ứng dụng
 
@@ -58,20 +59,29 @@ profiles được lưu cùng settings cục bộ.
 
 ### Di chuyển nhiều tài khoản Codex
 
-1. Đóng Codex Desktop và mọi Codex CLI, mở **Codex > Di chuyển tài khoản Codex**.
+1. Đóng Codex Desktop và mọi Codex CLI, mở **Codex > Di chuyển tài khoản Codex**. Nếu còn tiến trình nền, bấm **Đóng tiến trình Codex**, xác nhận, rồi kiểm tra lại; thao tác này hủy công việc Codex đang chạy.
 2. Ứng dụng tự phát hiện các thư mục trực tiếp `.codex` và `.codex-*` (ví dụ
-   `.codex-cus`) rồi tick sẵn. Giữ Chat/database, settings an toàn + `AGENTS.md`,
-   skills và pets theo khuyến nghị; chỉ bật worktrees, plugins hoặc
-   visualizations khi thực sự cần. Mỗi lựa chọn và tổng đang tick đều hiển thị
-   dung lượng ước tính từ metadata nguồn hiện tại.
+   `.codex-cus`) rồi tick sẵn mọi nhóm dữ liệu bền vững: Chat/database,
+   settings an toàn + `AGENTS.md`, skills, pets, dữ liệu Project ChatGPT cục bộ,
+   trạng thái Codex bổ sung, worktrees, plugins và visualizations. Project là
+   `.chatgpt-projects` bên trong account, gồm metadata, hướng dẫn và source cục
+   bộ; không đảm bảo dựng lại trạng thái Project cloud. Mỗi lựa chọn và tổng
+   đang tick đều hiển thị dung lượng ước tính từ metadata nguồn hiện tại.
 3. Nhấn **Tạo backup**. Ứng dụng báo lúc đang rà soát/tạo ZIP và báo hoàn tất
    ngay dưới nút. ZIP được kiểm SHA-256 sau khi ghi; `auth.json`, định danh
-   máy, cache, sandbox và runtime không bao giờ được gồm.
+   máy, cache, temporary/runtime, sandbox, metadata Git và settings có dấu
+   hiệu credential không bao giờ được gồm.
 4. Mục **Các bản backup đã tạo** cho biết số ZIP, thời gian và dung lượng. Có
    thể mở Explorer tại ZIP hoặc bấm **Xóa** và xác nhận để xóa đúng ZIP đó.
-5. Trên máy mới, chọn ZIP, xem trước, nhập `RESTORE`. File chỉ được tạo vào
-   đúng thư mục `.codex*` còn thiếu; file đích giống hoặc xung đột được giữ.
-   Đăng nhập lại Codex sau khi hoàn tất.
+5. Trên máy mới, copy ZIP vào thư mục `backups/`, rồi bấm **Khôi phục** ngay
+   trên dòng ZIP trong danh sách để kiểm tra và xem trước. Mặc định, nhập `RESTORE` để chỉ tạo
+   file còn thiếu; file giống hoặc xung đột được giữ. Nếu cần dùng snapshot từ
+   ZIP, chọn **Thay dữ liệu Codex từ backup này**, nhập `REPLACE CODEX`. Codex
+   phải đóng; Companion tạo và kiểm chứng ZIP safety dữ liệu Codex đích, rồi thay
+   dữ liệu local đã được backup. Đây không phải merge SQLite hay so sánh ngày sửa;
+   credential, cache và dữ liệu tạm không bao giờ được gồm. Đăng nhập lại Codex
+   và kiểm tra chat/project; ZIP safety có thể được chọn lại ở chính màn hình này
+   nếu cần quay về dữ liệu đích trước đó.
 
 ### Backup môi trường v2 cũ
 
@@ -85,7 +95,7 @@ profiles được lưu cùng settings cục bộ.
 
 - **Beyond Compare:** chọn file `.bcpkg` do `Tools > Export Settings` tạo. Companion giữ nguyên package, không chuyển license và không import tự động.
 - **SourceTree bookmark:** luồng tương thích chỉ đọc schema `bookmarks.xml` đã được kiểm chứng; phải đóng SourceTree. Repository, account, credential và license không được đưa vào bundle.
-- **SourceTree cấu hình cá nhân:** đóng SourceTree, mở trang **SourceTree**, nhập mật khẩu bundle tối thiểu 12 ký tự rồi chọn tạo bundle. Bundle AES-256 có thể gồm các file cục bộ phát hiện được: `accounts.json`, `bookmarks.xml`, `customactions.xml`, `hostedaccounts.xml`, `opentabs.xml`, `passwd`, `userhosts` và `user.config`. Khi phục hồi, chọn bundle, nhập mật khẩu, xem trước, nhập `RESTORE`; file đích có bản sao an toàn trước khi thay thế. Windows Credential Manager, OAuth/DPAPI và SSH key không nằm trong bundle nên có thể vẫn phải đăng nhập lại.
+- **SourceTree cấu hình cá nhân:** đóng SourceTree, mở trang **SourceTree**, nhập mật khẩu bundle tối thiểu 6 ký tự rồi chọn tạo bundle. Mục **Các bundle cấu hình đã tạo** cho biết tên, thời gian và dung lượng; có thể mở Explorer đúng file hoặc xóa sau khi xác nhận. Bundle AES-256 có thể gồm các file cục bộ phát hiện được: `accounts.json`, `bookmarks.xml`, `customactions.xml`, `hostedaccounts.xml`, `opentabs.xml`, `passwd`, `userhosts` và `user.config`. Khi phục hồi, bấm **Phục hồi cấu hình** ngay trên bundle cần dùng, nhập mật khẩu trong dòng bundle, chờ kiểm chứng, bấm **Xem trước phục hồi**, nhập `RESTORE` rồi bấm **Phục hồi cấu hình**; file đích có bản sao an toàn trước khi thay thế và kết quả liệt kê từng đường dẫn đã hash-verify. Tool tự chọn profile SourceTree đang hoạt động giữa `%LOCALAPPDATA%` và `%APPDATA%`. Chỉ để trống mật khẩu với bundle cũ chưa mã hóa. Windows Credential Manager, OAuth/DPAPI và SSH key không nằm trong bundle nên có thể vẫn phải đăng nhập lại.
 - **XAMPP:** chọn project trực tiếp dưới `htdocs` cùng bốn file cấu hình đã duyệt. Phải dừng Apache, MariaDB và process liên quan; binary, thư mục dữ liệu MariaDB, secret và log bị loại. Placement và import MariaDB vẫn thủ công.
 
 ## Kỹ năng, thú cưng và nén tệp
@@ -94,9 +104,10 @@ profiles được lưu cùng settings cục bộ.
   không ghi đè. Nội dung kỹ năng không hiện trong ứng dụng.
 - **Thú cưng:** chỉ nhận pet v2 hợp lệ kèm sprite PNG/WebP; cài đặt tạo thư mục
   mới, gỡ yêu cầu nhập `REMOVE`.
-- **Nén tệp:** cần 7-Zip cục bộ. Chọn thư mục nguồn, xem cây file chỉ đọc, đặt
-  exclusion rồi chọn Fast hoặc Strong. Tiến độ chỉ hiện phần trăm khi 7-Zip báo
-  dữ liệu đáng tin cậy; có thể Cancel, không ghi đè archive đã tồn tại.
+- **Nén tệp:** cần 7-Zip cục bộ. Khi chọn nguồn, dependency/build output/cache/log
+  phổ biến được bỏ chọn sẵn; có thể chọn lại từng mục trên cây file chỉ đọc. Đặt
+  exclusion bổ sung rồi chọn Fast hoặc Strong. Tiến độ chỉ hiện phần trăm khi 7-Zip
+  báo dữ liệu đáng tin cậy; có thể Cancel, không ghi đè archive đã tồn tại.
 
 ## Phục hồi vào máy đã có dữ liệu
 
@@ -124,7 +135,9 @@ File đổi nội dung/mtime, liên kết/junction, không rõ schema hoặc đa
 
 Chạy `release/portable/dev-companion.exe`; giữ toàn bộ thư mục cùng
 `portable-mode` cạnh exe. Khi bật Portable trong Settings, Companion dùng
-`config/`, `backups/` và `quarantine/` cạnh exe cho settings, backup phiên và
-safety data. Riêng bundle ứng dụng cá nhân luôn ghi vào `backup/` khi marker
-tồn tại, để copy cả thư mục portable là mang theo bundle. Không cần chạy quyền
+`config/`, `backups/` và `quarantine/` cạnh exe cho settings, backup và safety
+data. ZIP di chuyển Codex và bundle ứng dụng cá nhân cùng nằm trong `backups/`,
+nên copy cả thư mục portable là mang theo toàn bộ archive. Danh sách cấu hình
+SourceTree tự chuyển ZIP cũ đúng định dạng từ `backup/` sang `backups/`; nếu
+trùng tên, file cũ được giữ nguyên và không bị ghi đè. Không cần chạy quyền
 Administrator.

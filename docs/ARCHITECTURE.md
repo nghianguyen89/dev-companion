@@ -57,7 +57,7 @@ cell during every table render.
 
 ## Portable mode
 
-Portable mode requires a `portable-mode` marker file adjacent to the executable. When its setting is enabled and the marker is present, Companion stores its own config and backups alongside the executable in `config/` and `backups/`; personal application bundles use the adjacent `backup/` folder whenever the marker is present so they travel with `dev-companion.exe`. It does not move or rewrite Codex data.
+Portable mode requires a `portable-mode` marker file adjacent to the executable. When its setting is enabled and the marker is present, Companion stores its own config and all managed archives alongside the executable in `config/` and `backups/`; personal application bundles share `backups/` whenever the marker is present so they travel with `dev-companion.exe`. The SourceTree configuration list may move only its own validated legacy ZIPs from `backup/` into `backups/`, never overwriting a name collision. It does not move or rewrite Codex data.
 
 ## Safety boundary
 
@@ -81,11 +81,17 @@ outside it; missing or malformed markers abort the change.
 ## Codex Migration
 
 `codex_migration.rs` is a separate strict ZIP workflow for the current user's
-direct `.codex` and `.codex-*` folders. It snapshots selected accounts and
-components through narrow commands, validates the complete SHA-256 inventory,
-and restores only create-new files to the matching folder names. It never
-copies official CLI authentication, machine identity, runtime cache or sandbox
-data; destination conflicts remain untouched.
+direct `.codex` and `.codex-*` folders. It snapshots selected account,
+project-local, and other durable-state components through narrow commands,
+validates the complete SHA-256 inventory, and restores only create-new files
+to matching folder names by default. An
+explicit replace-chat mode snapshots the target's allowlisted chat files into a
+verified safety ZIP, then replaces the complete chat snapshot; it never merges
+SQLite or chooses files by timestamp. It never copies official CLI
+authentication, machine identity, runtime cache or sandbox data.
+The project-local component transfers `.chatgpt-projects` metadata,
+instructions and sources only; it does not promise to recreate cloud project
+state.
 The archive list exposes only direct regular `codex-migration-<timestamp>.zip`
 files in the Companion backup directory; its reveal/delete commands revalidate
 that narrow filename and reject links or arbitrary paths.
@@ -133,9 +139,14 @@ filenames and byte counts rather than contents, and verifies manifest,
 inventory and hashes before restoring. New version-2 bundles encrypt every
 entry with AES-256; passwords are command-only and never enter plans, settings,
 manifests, logs, or history. Version-1 unencrypted bundles remain readable.
-Existing files get a Companion-owned safety copy and restore rolls back on
-later write failures. Windows Vault, OAuth/DPAPI-bound secrets and SSH keys
+Existing files get a Companion-owned safety copy; every replaced target is
+verified against the bundled SHA-256 and restore rolls back on a later write
+or verification failure. Windows Vault, OAuth/DPAPI-bound secrets and SSH keys
 remain out of scope because they are not portable file settings.
+The configuration archive list exposes only direct regular
+`sourcetree-config-<timestamp>.zip` files in the Companion bundle directory;
+reveal and delete revalidate that narrow name and reject links or arbitrary
+paths.
 
 ## Phase 3 XAMPP files boundary
 

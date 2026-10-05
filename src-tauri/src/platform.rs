@@ -49,13 +49,19 @@ pub fn backup_dir(configuration: &AppConfiguration) -> PathBuf {
 
 fn personal_bundle_dir_at(portable: Option<PathBuf>) -> PathBuf {
     portable
-        .map(|root| root.join("backup"))
+        .map(|root| root.join("backups"))
         .unwrap_or_else(|| app_data_dir().join("personal-bundles"))
 }
 
-/// Personal bundles stay beside the portable executable when its marker is present.
+/// Personal bundles share the portable backup folder when its marker is present.
 pub fn personal_bundle_dir() -> PathBuf {
     personal_bundle_dir_at(portable_root())
+}
+
+/// The portable layout used this folder before all Companion archives were unified.
+/// Callers must migrate only their own strictly validated archive names from it.
+pub fn legacy_personal_bundle_dir() -> Option<PathBuf> {
+    portable_root().map(|root| root.join("backup"))
 }
 pub fn personal_staging_dir() -> PathBuf {
     app_data_dir().join("staging")
@@ -77,10 +83,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn portable_personal_bundles_stay_with_the_executable() {
+    fn portable_personal_bundles_share_the_backup_folder() {
         assert_eq!(
             personal_bundle_dir_at(Some(PathBuf::from(r"D:\Portable\Dev Companion"))),
-            PathBuf::from(r"D:\Portable\Dev Companion\backup")
+            PathBuf::from(r"D:\Portable\Dev Companion\backups")
         );
     }
 }

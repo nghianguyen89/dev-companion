@@ -24,6 +24,8 @@ const GROUPS: &[&str] = &[
     "settings",
     "skills",
     "pets",
+    "projects",
+    "state",
     "worktrees",
     "plugins",
     "visualizations",
@@ -130,6 +132,13 @@ pub struct Restored {
     pub skipped: usize,
     pub errors: Vec<String>,
     pub rollback_remaining: usize,
+    pub safety_archive: Option<String>,
+}
+
+#[derive(Clone)]
+struct SafetyEntry {
+    target: PathBuf,
+    entry: Entry,
 }
 
 #[derive(Clone)]
@@ -333,16 +342,53 @@ fn delete_archive_at(directory: &Path, name: &str) -> Result<()> {
 pub fn delete_archive(name: &str) -> Result<()> {
     delete_archive_at(&backup_directory()?, name)
 }
+pub fn inspect_archive(name: &str) -> Result<Preview> {
+    inspect(archive_path_at(&backup_directory()?, name)?)
+}
 
 fn protected(path: &str) -> bool {
-    matches!(path, "auth.json" | "cap_sid" | "installation_id")
+    path.split('/').any(|part| {
+        matches!(
+            part.to_ascii_lowercase().as_str(),
+            "auth.json" | "cap_sid" | "installation_id"
+        )
+    })
 }
 fn runtime(path: &str) -> bool {
-    path.split('/').next().is_some_and(|part| {
+    path.split('/').any(|part| {
         matches!(
-            part,
-            "cache" | ".tmp" | ".sandbox" | ".sandbox-bin" | "vendor_imports"
+            part.to_ascii_lowercase().as_str(),
+            "cache"
+                | ".tmp"
+                | "tmp"
+                | ".sandbox"
+                | ".sandbox-bin"
+                | ".sandbox-secrets"
+                | "vendor_imports"
+                | "node_modules"
+                | "thread-writer-locks"
         )
+    }) || path.split('/').next().is_some_and(|root| {
+        matches!(
+            root,
+            "app-server-control"
+                | "app-server-daemon"
+                | "ambient-suggestions"
+                | "packages"
+                | "tui-thread-reference-capabilities"
+                | ".sandbox_migration"
+        )
+    }) || path.split('/').next_back().is_some_and(|name| {
+        let name = name.to_ascii_lowercase();
+        name.ends_with(".tmp")
+            || name.contains(".tmp-")
+            || matches!(
+                name.as_str(),
+                ".sqlite-maintenance.lock"
+                    | "models_cache.json"
+                    | "version.json"
+                    | ".sandbox_migration"
+            )
     })
 }
 fn classify(path: &str) -> Option<&'static str> {
@@ -353,6 +399,9 @@ fn classify(path: &str) -> Option<&'static str> {
             .any(|part| matches!(part, "backups" | "quarantine" | ".git"))
     {
         return None;
+    }
+    if path.starts_with(".chatgpt-projects/") {
+        return Some("projects");
     }
     if path.starts_with("sessions/")
         || path.starts_with("archived_sessions/")
@@ -385,7 +434,7 @@ fn classify(path: &str) -> Option<&'static str> {
     if path.starts_with("visualizations/") {
         return Some("visualizations");
     }
-    None
+    Some("state")
 }
 fn excluded_reason(path: &str) -> &'static str {
     if protected(path) {
@@ -779,7 +828,8 @@ fn inspect_at(path: &Path) -> Result<Manifest> {
             .ok_or("Unknown account in archive entry.")?;
         fs_safety::relative(&entry.relative_path)?;
         if !GROUPS.contains(&entry.group.as_str())
-            || classify(&entry.relative_path) != Some(entry.group.as_str())
+            || (classify(&entry.relative_path) != Some(entry.group.as_str())
+                && !(entry.group == "state" && runtime(&entry.relative_path)))
             || entry.archive_path
                 != format!("accounts/{}/{},", account.folder, entry.relative_path)
                     .trim_end_matches(',')
@@ -857,6 +907,142 @@ fn restore_items(root: &Path, manifest: &Manifest) -> Result<Vec<RestoreItem>> {
         })
         .collect()
 }
+fn chat_safety_entries(root: &Path, manifest: &Manifest) -> Result<Vec<SafetyEntry>> {
+    let mut entries = Vec::new();
+    for account in &manifest.accounts {
+        if !manifest
+            .entries
+            .iter()
+            .any(|entry| entry.account_id == account.id && !runtime(&entry.relative_path))
+        {
+            continue;
+        }
+        let account_home = root.join(&account.folder);
+        if !account_home.exists() {
+            continue;
+        }
+        fs_safety::check(&account_home)?;
+        let mut files = Vec::new();
+        let mut skipped_links = 0;
+        walk(&account_home, &account_home, &mut files, &mut skipped_links)?;
+        for relative_path in files {
+            let Some(group) = classify(&relative_path) else {
+                continue;
+            };
+            if runtime(&relative_path) {
+                continue;
+            }
+            let target = account_home.join(&relative_path);
+            let bytes = fs::metadata(&target).map_err(|e| e.to_string())?.len();
+            entries.push(SafetyEntry {
+                target,
+                entry: Entry {
+                    account_id: account.id.clone(),
+                    relative_path: relative_path.clone(),
+                    archive_path: format!("accounts/{}/{relative_path}", account.folder),
+                    group: group.into(),
+                    bytes,
+                    sha256: hash_file(&account_home.join(relative_path))?,
+                },
+            });
+        }
+    }
+    entries.sort_by(|left, right| left.entry.archive_path.cmp(&right.entry.archive_path));
+    Ok(entries)
+}
+fn verify_chat_safety_archive(path: &Path, expected: &[SafetyEntry]) -> Result<()> {
+    let manifest = inspect_at(path)?;
+    if manifest.entries
+        != expected
+            .iter()
+            .map(|item| item.entry.clone())
+            .collect::<Vec<_>>()
+    {
+        return Err("Safety archive manifest mismatch.".into());
+    }
+    Ok(())
+}
+fn create_chat_safety_archive(
+    root: &Path,
+    manifest: &Manifest,
+) -> Result<(Option<PathBuf>, Vec<SafetyEntry>)> {
+    let entries = chat_safety_entries(root, manifest)?;
+    if entries.is_empty() {
+        return Ok((None, entries));
+    }
+    let directory = backup_directory()?;
+    fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+    let path = directory.join(format!(
+        "codex-safety-{}.zip",
+        time::OffsetDateTime::now_utc().unix_timestamp_nanos()
+    ));
+    let file = OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(&path)
+        .map_err(|e| e.to_string())?;
+    let result = (|| -> Result<()> {
+        let mut zip = ZipWriter::new(file);
+        let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
+        let safety_manifest = Manifest {
+            format_version: 1,
+            kind: "dev-companion-codex-migration".into(),
+            created_at: time::OffsetDateTime::now_utc()
+                .format(&time::format_description::well_known::Rfc3339)
+                .unwrap(),
+            platform: "windows".into(),
+            accounts: manifest.accounts.clone(),
+            entries: entries.iter().map(|item| item.entry.clone()).collect(),
+        };
+        zip.start_file("codex-migration-manifest.json", options)
+            .map_err(|e| e.to_string())?;
+        zip.write_all(&serde_json::to_vec_pretty(&safety_manifest).unwrap())
+            .map_err(|e| e.to_string())?;
+        for item in &entries {
+            let mut input = environment::locked_read(&item.target)?;
+            zip.start_file(&item.entry.archive_path, options)
+                .map_err(|e| e.to_string())?;
+            if copy_and_hash(&mut input, &mut zip)? != item.entry.sha256 {
+                return Err("Destination changed; inspect again.".into());
+            }
+        }
+        zip.finish()
+            .map_err(|e| e.to_string())?
+            .sync_all()
+            .map_err(|e| e.to_string())?;
+        verify_chat_safety_archive(&path, &entries)
+    })();
+    if let Err(error) = result {
+        let _ = fs::remove_file(&path);
+        return Err(error);
+    }
+    Ok((Some(path), entries))
+}
+fn restore_chat_safety(path: &Path, entries: &[SafetyEntry]) -> Result<()> {
+    let mut zip = ZipArchive::new(environment::locked_read(path)?).map_err(|e| e.to_string())?;
+    for item in entries {
+        fs_safety::check(&item.target)?;
+        fs::create_dir_all(item.target.parent().unwrap()).map_err(|e| e.to_string())?;
+        let mut output = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&item.target)
+            .map_err(|e| e.to_string())?;
+        std::io::copy(
+            &mut zip
+                .by_name(&item.entry.archive_path)
+                .map_err(|e| e.to_string())?,
+            &mut output,
+        )
+        .map_err(|e| e.to_string())?;
+        output.sync_all().map_err(|e| e.to_string())?;
+        drop(output);
+        if hash_file(&item.target)? != item.entry.sha256 {
+            return Err("Safety archive rollback verification failed.".into());
+        }
+    }
+    Ok(())
+}
 pub fn preview_restore(token: &str) -> Result<RestorePreview> {
     let Plan::Archive(path, hash) = get(token)? else {
         return Err("Inspect archive first.".into());
@@ -871,9 +1057,14 @@ pub fn preview_restore(token: &str) -> Result<RestorePreview> {
         items,
     })
 }
-pub fn restore(token: &str, confirmation: &str) -> Result<Restored> {
-    if confirmation != "RESTORE" {
-        return Err("Type RESTORE to confirm.".into());
+pub fn restore(token: &str, confirmation: &str, replace_chat: bool) -> Result<Restored> {
+    let expected_confirmation = if replace_chat {
+        "REPLACE CODEX"
+    } else {
+        "RESTORE"
+    };
+    if confirmation != expected_confirmation {
+        return Err(format!("Type {expected_confirmation} to confirm."));
     }
     environment::require_closed()?;
     let Plan::Restore(path, hash, items) = get(token)? else {
@@ -882,12 +1073,13 @@ pub fn restore(token: &str, confirmation: &str) -> Result<Restored> {
     if digest(&fs::read(&path).map_err(|e| e.to_string())?) != hash {
         return Err("Archive changed; inspect again.".into());
     }
-    restore_at(&home_dir()?, &path, &items, None)
+    restore_at(&home_dir()?, &path, &items, replace_chat, None)
 }
 fn restore_at(
     root: &Path,
     path: &Path,
     items: &[RestoreItem],
+    replace_chat: bool,
     fail_after: Option<usize>,
 ) -> Result<Restored> {
     let manifest = inspect_at(path)?;
@@ -895,23 +1087,44 @@ fn restore_at(
     if current != items {
         return Err("Destination changed; inspect again.".into());
     }
+    if replace_chat && manifest.entries.is_empty() {
+        return Err("This backup contains no Codex data to replace.".into());
+    }
     let mut zip = ZipArchive::new(environment::locked_read(path)?).map_err(|e| e.to_string())?;
     let mut result = Restored::default();
     let mut created = Vec::new();
+    let (safety_archive, safety_entries) = if replace_chat {
+        create_chat_safety_archive(root, &manifest)?
+    } else {
+        (None, Vec::new())
+    };
+    result.safety_archive = safety_archive
+        .as_ref()
+        .map(|archive| archive.to_string_lossy().into_owned());
     let attempt = (|| -> Result<()> {
+        if replace_chat {
+            for item in &safety_entries {
+                fs_safety::check(&item.target)?;
+                fs::remove_file(&item.target).map_err(|e| e.to_string())?;
+            }
+        }
         for item in &current {
-            if item.status != "new" {
+            let entry = manifest
+                .entries
+                .iter()
+                .find(|entry| entry.archive_path == item.archive_path)
+                .unwrap();
+            if runtime(&entry.relative_path) {
+                result.skipped += 1;
+                continue;
+            }
+            if !replace_chat && item.status != "new" {
                 result.skipped += 1;
                 continue;
             }
             if fail_after == Some(created.len()) {
                 return Err("Injected restore failure.".into());
             }
-            let entry = manifest
-                .entries
-                .iter()
-                .find(|entry| entry.archive_path == item.archive_path)
-                .unwrap();
             let account = manifest
                 .accounts
                 .iter()
@@ -947,6 +1160,11 @@ fn restore_at(
                 result.rollback_remaining += 1;
             }
         }
+        if let (Some(archive), false) = (safety_archive.as_ref(), safety_entries.is_empty()) {
+            if restore_chat_safety(archive, &safety_entries).is_err() {
+                result.rollback_remaining += safety_entries.len();
+            }
+        }
     } else {
         result.restored = created.len();
     }
@@ -962,15 +1180,32 @@ mod tests {
             time::OffsetDateTime::now_utc().unix_timestamp_nanos()
         ));
         let personal = root.join(".codex");
+        let projects = personal.join(".chatgpt-projects");
         let work = root.join(".codex-cus");
         fs::create_dir_all(personal.join("sessions")).unwrap();
+        fs::create_dir_all(projects.join(".metadata")).unwrap();
+        fs::create_dir_all(projects.join("g-p-example/sources")).unwrap();
         fs::create_dir_all(work.join("pets/nyx")).unwrap();
         fs::create_dir_all(work.join("worktrees/wip")).unwrap();
         fs::create_dir_all(personal.join("cache")).unwrap();
         fs::write(personal.join("sessions/chat.jsonl"), "chat").unwrap();
         fs::write(personal.join("thread_history_1.sqlite"), "db").unwrap();
         fs::write(personal.join("auth.json"), "secret").unwrap();
+        fs::write(personal.join("AUTH.JSON"), "secret").unwrap();
+        fs::write(projects.join(".metadata/g-p-example.json"), "metadata").unwrap();
+        fs::write(projects.join("g-p-example/sources/note.txt"), "project").unwrap();
+        fs::write(projects.join("g-p-example/sources/Cargo.lock"), "lock").unwrap();
+        fs::write(projects.join("g-p-example/sources/AUTH.JSON"), "secret").unwrap();
+        fs::write(personal.join(".codex-global-state.json"), "state").unwrap();
+        fs::create_dir_all(personal.join("app-server-daemon")).unwrap();
+        fs::write(personal.join("app-server-daemon/runtime.exe"), "runtime").unwrap();
+        fs::write(personal.join("state.json.tmp-123"), "temporary").unwrap();
+        fs::write(personal.join(".sqlite-maintenance.lock"), "temporary").unwrap();
         fs::write(personal.join("cache/runtime"), "cache").unwrap();
+        fs::create_dir_all(personal.join("CACHE")).unwrap();
+        fs::write(personal.join("CACHE/runtime"), "cache").unwrap();
+        fs::create_dir_all(personal.join("tmp")).unwrap();
+        fs::write(personal.join("tmp/recreated"), "temporary").unwrap();
         fs::write(work.join("pets/nyx/pet.json"), "{}").unwrap();
         fs::write(work.join("worktrees/wip/readme.md"), "uncommitted").unwrap();
         let accounts = vec![
@@ -980,7 +1215,13 @@ mod tests {
         (
             root,
             accounts,
-            vec!["chat".into(), "pets".into(), "worktrees".into()],
+            vec![
+                "chat".into(),
+                "pets".into(),
+                "projects".into(),
+                "state".into(),
+                "worktrees".into(),
+            ],
         )
     }
     #[test]
@@ -1013,6 +1254,15 @@ mod tests {
             2
         );
         assert_eq!(
+            estimates[0]
+                .groups
+                .iter()
+                .find(|group| group.id == "projects")
+                .unwrap()
+                .bytes,
+            19
+        );
+        assert_eq!(
             estimates[1]
                 .groups
                 .iter()
@@ -1021,10 +1271,24 @@ mod tests {
                 .bytes,
             11
         );
-        assert_eq!(entries.len(), 4);
+        assert_eq!(entries.len(), 8);
+        assert!(!entries.iter().any(|entry| entry
+            .relative_path
+            .to_ascii_lowercase()
+            .contains("auth.json")));
         assert!(!entries
             .iter()
-            .any(|entry| entry.relative_path == "auth.json"));
+            .any(|entry| entry.relative_path.starts_with("tmp/")
+                || entry.relative_path.starts_with("cache/")
+                || entry.relative_path.starts_with("CACHE/")
+                || entry.relative_path.contains(".tmp-")
+                || entry.relative_path == ".sqlite-maintenance.lock"));
+        assert!(!entries
+            .iter()
+            .any(|entry| entry.relative_path.starts_with("app-server-daemon/")));
+        assert!(entries
+            .iter()
+            .any(|entry| entry.relative_path.ends_with("Cargo.lock")));
         assert!(excluded
             .iter()
             .any(|group| group.reason.contains("Authentication")));
@@ -1038,11 +1302,16 @@ mod tests {
         assert_eq!(manifest.entries, entries);
         let destination = root.join("destination");
         let items = restore_items(&destination, &manifest).unwrap();
-        let failed = restore_at(&destination, &archive_path, &items, Some(1)).unwrap();
+        let failed = restore_at(&destination, &archive_path, &items, false, Some(1)).unwrap();
         assert_eq!(failed.rollback_remaining, 0);
         assert!(!destination.join(".codex/sessions/chat.jsonl").exists());
-        let done = restore_at(&destination, &archive_path, &items, None).unwrap();
-        assert_eq!(done.restored, 4);
+        let done = restore_at(&destination, &archive_path, &items, false, None).unwrap();
+        assert_eq!(done.restored, 8);
+        assert_eq!(
+            fs::read(destination.join(".codex/.chatgpt-projects/g-p-example/sources/note.txt"))
+                .unwrap(),
+            b"project"
+        );
         assert_eq!(
             fs::read(destination.join(".codex-cus/worktrees/wip/readme.md")).unwrap(),
             b"uncommitted"
@@ -1052,14 +1321,48 @@ mod tests {
             "destination",
         )
         .unwrap();
+        fs::write(
+            destination.join(".codex/thread_history_1.sqlite"),
+            "target-db",
+        )
+        .unwrap();
         let conflicts = restore_items(&destination, &manifest).unwrap();
         assert!(conflicts.iter().any(|item| item.status == "conflict"));
+        let kept = restore_at(&destination, &archive_path, &conflicts, false, None).unwrap();
+        assert_eq!(kept.restored, 0);
+        assert!(kept.errors.is_empty());
+        let failed_replacement =
+            restore_at(&destination, &archive_path, &conflicts, true, Some(1)).unwrap();
+        assert_eq!(failed_replacement.rollback_remaining, 0);
         assert_eq!(
-            restore_at(&destination, &archive_path, &conflicts, None)
-                .unwrap()
-                .restored,
-            0
+            fs::read(destination.join(".codex/sessions/chat.jsonl")).unwrap(),
+            b"destination"
         );
+        assert_eq!(
+            fs::read(destination.join(".codex/thread_history_1.sqlite")).unwrap(),
+            b"target-db"
+        );
+        fs::write(destination.join(".codex/auth.json"), "target-secret").unwrap();
+        let replacement = restore_at(&destination, &archive_path, &conflicts, true, None).unwrap();
+        assert_eq!(replacement.restored, 8);
+        let safety = PathBuf::from(replacement.safety_archive.unwrap());
+        let safety_entries =
+            chat_safety_entries(&destination, &inspect_at(&archive_path).unwrap()).unwrap();
+        assert!(safety.exists());
+        assert!(inspect_at(&safety).is_ok());
+        assert_eq!(
+            fs::read(destination.join(".codex/sessions/chat.jsonl")).unwrap(),
+            b"chat"
+        );
+        assert_eq!(
+            fs::read(destination.join(".codex/thread_history_1.sqlite")).unwrap(),
+            b"db"
+        );
+        assert!(!ZipArchive::new(File::open(safety).unwrap())
+            .unwrap()
+            .file_names()
+            .any(|name| name.ends_with("auth.json")));
+        assert_eq!(safety_entries.len(), 8);
         fs::remove_dir_all(root).unwrap();
     }
     #[test]

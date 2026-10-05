@@ -27,9 +27,8 @@ files into logs, commits, screenshots, or bug reports.
   the configuration as the first fix.
 - Portable build behaves like an installed build: confirm `portable-mode` is
   adjacent to `dev-companion.exe`; keep the full portable folder together.
-- A personal bundle is not visible on the Dashboard: use **Làm mới** and verify
-  it is a direct file in `backup/` (personal bundle) or `backups/` (session
-  backup), not in a nested folder.
+- A managed archive is not visible on the Dashboard: use **Làm mới** and verify
+  it is a direct file in `backups/`, not in a nested folder.
 
 ## Conversations filter/refresh stalls — 2026-09-09
 

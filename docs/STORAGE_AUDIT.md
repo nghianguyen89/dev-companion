@@ -21,12 +21,12 @@ Catalog evidence: [OpenAI Codex catalog cache implementation](https://github.com
 | Chat | `sessions/`, `archived_sessions/`, `attachments/` | Create new files only |
 | Chat state | `session_index.jsonl`, `.codex-global-state.json`, the five named DB families above including WAL/SHM, `sqlite/` | Archive only; manual migration |
 | Settings | `config.toml`, `AGENTS.md`, `hooks.json`, `rules/`, `prompts/` | Archive only; manual configuration; files with credential indicators excluded intact |
-| Skills | `skills/`, `plugins/cache/` including supporting resources | Create new files; conflict skip; plugin registry/reconnection separate |
+| Skills | `skills/` | Create new files; conflict skip; plugin registry/reconnection separate |
 | Pets | `pets/` and its assets | Create new files; conflict skip |
 
-Excluded: auth/credential store, `auth.json`, `cap_sid`, installation identity, logs/diagnostic DB, regenerable cache, tmp/crash/incomplete downloads outside the allowlist, old backup/quarantine names, `.git`, and everything outside supported groups. Preview accounts for excluded regular files by reason; no source file is removed. Symlinks/junctions abort inventory rather than quietly following them.
+Excluded: auth/credential store, `auth.json`, `cap_sid`, installation identity, logs/diagnostic DB, regenerable `cache/`, `plugins/cache/`, `tmp/` and `models_cache.json`, crash/incomplete downloads outside the allowlist, old backup/quarantine names, `.git`, and everything outside supported groups. Preview accounts for excluded regular files by reason; no source file is removed. Symlinks/junctions are listed as excluded and never followed.
 
-`plugins/cache` is intentionally retained with skills. It is installed resource storage, not treated as disposable merely because of its name. Plugin runtime/staging/registry outside this tree is excluded; reinstall/reconnect on destination. External scripts, SDKs, Node/Python dependencies outside included directories, linked skills (including external `.agents/skills`), project-level configs, shell credentials and executables require separate setup.
+Plugin resources/cache, runtime, staging and registry are excluded; reinstall/reconnect them on the destination. External scripts, SDKs, Node/Python dependencies outside included directories, linked skills (including external `.agents/skills`), project-level configs, shell credentials and executables require separate setup.
 
 Backups, projects/worktrees, uncommitted files, generated artifacts in other folders, automations, memories directories, remote/cloud chats and OS credential stores are outside automatic migration. Referenced absolute file/project paths are not rewritten. Entire environment usability is therefore **not yet verified**.
 
