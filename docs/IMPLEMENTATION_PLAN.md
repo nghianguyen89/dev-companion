@@ -1,5 +1,207 @@
 # Implementation Plan — Personal application migration
 
+## 2026-10-06: SQLite copy boundary and stale sampled UI
+
+- Latest raw log reaches completed=608, copy-file for .codex/state_5.sqlite,
+  with complete callback-return pairs and zero rejected enqueue records. The
+  ZIP entry is 14,446,592 bytes (3,243,973 compressed); read vs write blocking
+  is not established. User measured 6,685,187 bytes twice, thirty seconds apart:
+  the destination copy itself is incomplete and stationary.
+- The new screenshot's UI still shows563: native progressed beyond that, but
+  the leading-edge100ms gate discarded the last event and has no timer to
+  flush it during a long I/O wait. Replace it with a latest-value observer
+  that samples on its own timer; never hold its mutex during Channel.send,
+  and never join that UI-only worker from data work.
+- Split shared restore/rollback copy into64KiB read/write phases with confirmed
+  output byte counts, retry Interrupted reads and preserve read-to-EOF/CRC,
+  final size/SHA, source locks and rollback. Do not skip the database or weaken
+  verification; no underlying device/cloud/filter cause is yet attributed.
+- Frontend ignores late callbacks after invoke settles and derives completion
+  from the native result. Tests cover trailing UI delivery without another
+  native event, blocked UI transport, chunking/Interrupted/short-write errors,
+  IPC cleanup, native integrity/rollback and the real ZIP before separate build.
+- Repeated attempts intentionally retain safety snapshots. User can remove
+  intermediate snapshots after closing Companion, preserving the original
+  migration ZIP, first safety snapshot and latest safety until verification.
+
+Completed locally: 13 focused migration tests, four command tests, frontend
+check/lint and 34 tests, independent review, and optimized separate copy-progress
+EXE passed. The actual 618-file ZIP passed fresh/populated isolated restoration
+with every output independently SHA-checked and actual asynchronous tracing.
+Target-machine I/O cause, packaged interaction and completion remain unverified.
+
+## 2026-10-06: Confirmed partial diagnostic write holds restore
+
+- User confirms the original log ends mid-JSON, after writing the true callback
+  flag during `verify-read` on entry 595. That proves callback return and entry
+  into the after-callback diagnostic write; file verification has not resumed.
+- The logger currently serializes JSON directly into a File on the restore
+  thread. Ignoring write errors does not prevent a blocking write from holding
+  restore. Move only diagnostic writes to a worker with a bounded std channel
+  and non-waiting `try_send`; serialize complete records on the producer.
+- Create the log and worker before mutations. Never join that worker during
+  production restore/rollback/completion. It owns only the Companion log,
+  never a destination or safety file. Drop excess/disconnected diagnostics,
+  report gaps on the next accepted record, and retain all integrity checks.
+- Test a deliberately blocked writer with a full queue while a real isolated
+  restore completes; release/join only for test cleanup. Test disconnected
+  logging, complete record encoding, overwrite/verification/rollback, then
+  independently review and build a distinct portable EXE.
+
+Completed: 12 focused migration tests plus real supplied ZIP with actual async
+trace passed on fresh/populated isolated targets (618/618 independently SHA
+checked each). Independent review, optimized separate log-fix EXE and diff
+check passed. Actual new-machine completion and Projects menu remain unverified.
+
+## 2026-10-06: Entry 595 finishes; next target preparation stops
+
+- User trace confirms size/read/SHA and close completed for `validate_atlas.py`;
+  the next file stops at `prepare-target`. Existing records precede the progress
+  callback as well as filesystem operations, so earlier attribution to a
+  particular blocked filesystem call was too strong.
+- Record callback return explicitly, split target check/mkdir/recheck, and log
+  the exact ancestor before each metadata inspection. Keep path/reparse checks,
+  actual-byte hashes and rollback intact. Ancestor details stay in local logs.
+- Limit UI notifications to stage changes and at most ten updates per second;
+  keep every native operation in the diagnostic trace. This bounds UI traffic,
+  without claiming that IPC is the established cause.
+- Verify callback bracketing, ancestor coverage/reparse rejection and restore
+  ordering. Independent review and separately named optimized EXE required.
+  Target-machine completion still needs evidence; no integrity bypass or
+  file-specific exception is permitted.
+
+Completed locally: 10 migration and four command tests, frontend check/lint and
+33 tests, independent review, optimized separately named path-trace EXE and
+diff check passed. Data-copy/verifier remains unchanged; no repeat of the prior
+618-file real-ZIP check in this diagnostic delta. Target-machine root cause,
+actual IPC under load and completion remain unverified.
+
+## 2026-10-06: Verification after close still stalls on target
+
+- Synced flush-fix EXE matches the built SHA. Latest target logs reach
+  `close-file`, then stop at `verify-file` for the same entry 595. The older
+  independent PowerShell check of those bytes returned the correct SHA quickly.
+  The destination reopen/check/read path is now the unconfirmed substep.
+- Verify the actual destination through its original read/write `create_new`
+  handle before closing. On Windows deny competing writes/deletes while that
+  handle is held. Check file length, seek to zero, stream exactly the expected
+  byte count and compare SHA. Preserve source/safety locks and all rollback.
+- Apply the same output verification to safety rollback. Trace size/seek/read/
+  digest boundaries, without recording content. No hash bypass, skipped files,
+  detached timeouts or hard-coded exception for `validate_atlas.py`.
+- Test same-handle verification, size/SHA mismatch rollback and Windows handle
+  sharing. Validate source/target checks and build a separately named EXE.
+  Independent review approved the mechanism; remote completion still requires
+  target-machine evidence and is not inferred from local round trips.
+
+Completed locally: nine focused native tests, frontend check/lint and 33 tests,
+independent review, optimized EXE build and the real supplied ZIP restored and
+independently SHA-checked 618/618 on fresh/populated isolated targets. Separate
+`dev-companion-migration-handle-fix-20261006.exe` built; target-machine completion
+and Projects menu remain unverified. See `docs/VALIDATION.md` for evidence.
+
+## 2026-10-06: Confirmed destination disk-sync stall
+
+- New target logs end at `flush-file` for entry 595, immediately before
+  `output.sync_all()`, without reaching close/SHA check. Copy returned in
+  milliseconds; the independently read target hash already matches.
+- Remove the per-destination-file forced disk sync in both restoration and
+  safety rollback. Close outputs and read/hash them as normal file copies.
+  Keep both backup/safety ZIP syncs and strict safety verification before any
+  deletion. Do not substitute `sync_data`, a no-op `File::flush`, a final
+  forced sync, or detached timeouts that leave an active writer behind.
+- Destination completion confirms readable matching bytes using Windows
+  writeback, not physical power-loss durability for every output file. Retain
+  source/safety ZIPs for recovery if an interruption leaves a partial target.
+- Validate phase order without the destination flush, overwrite/rollback,
+  and real supplied ZIP on fresh/fully populated isolated targets. Build a
+  separately named optimized EXE. Independent review approved this scope;
+  actual target-machine completion remains a manual check.
+
+Completed: 7 focused native tests; actual supplied ZIP verified 618/618 outputs
+in both fresh and populated isolated targets; independent review; optimized
+separate flush-fix EXE built. No destination `sync_all()` remains in this module;
+the two archive syncs remain. Test details/hashes are in `docs/VALIDATION.md`.
+
+## 2026-10-06: Restore counter stopped at 594/618
+
+- On the new machine, restore stays at 594. Next entry is the 10,983-byte
+  `skills/hatch-pet/scripts/validate_atlas.py`; the target file exists with the
+  full 10,983 bytes, while entry 615 `transcription-history.jsonl` is absent.
+  This confirms native completion cannot be assumed. Isolated extraction,
+  durable flush and SHA verification of that exact ZIP member took 131 ms.
+- Existing progress is emitted only after copy, disk sync, close and SHA check.
+  Add current relative filename and substep before those operations. Preserve
+  all checks and synchronous rollback; never detach timed-out file operations.
+- Write metadata-only phase records to a Companion-owned local diagnostic log
+  so a lost channel message cannot hide actual native progress. Do not log file
+  contents or credential paths. No cause is attributed to antivirus/cloud I/O
+  without target-machine evidence. Validate phase ordering and trace metadata.
+
+## 2026-10-06: Long-running replacement without feedback
+
+- The target-machine report shows replacement busy for about 30 minutes, with
+  no progress. No matching running process is available on this development
+  machine, so the remote operation phase is not confirmed.
+- Safety discovery previously walked every account directory (including excluded
+  caches/runtimes) before filtering. Collect archived targets directly and
+  recurse only chat directories needed for snapshot rollback; deduplicate
+  Windows paths and retain reparse-point checks. Do not inspect authentication.
+- Use uncompressed verified safety ZIPs to avoid recompressing the destination.
+  Keep all safety/rollback and destination SHA-256 guarantees.
+- Report queued/process-check/archive-check/destination/safety/restore/rollback
+  stages through a per-invocation Tauri channel. Show truthful stage/file counts,
+  with an indeterminate state when the total is unknown.
+- Validate both a fresh and fully populated target with the supplied archive,
+  plus progress and excluded-directory regression tests. Build a new separately
+  named portable executable; preserve the previous artifacts.
+
+Completed: frontend check/lint/build and 33 tests; 6 focused native tests;
+real supplied ZIP restored 618/618 SHA-256-matching files on both fresh and
+fully populated isolated targets. Independent review found no integrity or
+data-loss blockers. Separate optimized progress EXE built. No remote process
+or new-machine Desktop behavior was inspected; the reported 30-minute phase
+is still unconfirmed. Stored safety copies trade compression time for disk
+space and can be about 1 GiB for this archive.
+
+## 2026-10-06: Restore overwrites and recovery layout regression
+
+- The supplied Codex ZIP contains `.codex-global-state.json`, local project
+  metadata, and databases. Its global-state keys include `local-projects` and
+  `project-order`; create-only recovery leaves a freshly installed target's
+  conflicting registry untouched. Default migration recovery to the explicit
+  safety-backed replacement path, requiring `REPLACE CODEX`; the migration
+  page no longer offers the keep-existing mode.
+- Replace every archived supported file, including project/global state. Keep
+  destination components absent from the archive; only chat data uses complete
+  snapshot replacement to avoid stale SQLite WAL/SHM companions. Track removed
+  files for rollback so an interrupted deletion cannot prevent recovery of
+  files already removed. Verify populated-target project replacement and rollback.
+- SourceTree restores primary configuration files to both standard Local and
+  Roaming roots; the backup's source profile is not destination evidence.
+  Discover primary source files from Local first, falling back per file to
+  Roaming. Detect the installed `user.config` independently.
+  Preserve old bundle compatibility, safety copies, and destination hash checks.
+- Narrow archive action-row CSS so appending the recovery panel cannot turn it
+  into a horizontal flex row. Visually verify both recovery panels.
+- Run frontend/native checks and produce a separately named portable test build;
+  preserve the existing portable executable. Real new-machine Desktop behavior
+  remains a manual verification, distinct from file round-trip checks.
+
+## 2026-10-05: Deterministic SourceTree profile restore and Codex project evidence
+
+- Store the SourceTree configuration profile (`LOCALAPPDATA` or `APPDATA`) in
+  new encrypted bundles. The original same-profile restore plan was superseded
+  on 2026-10-06: source provenance cannot identify the new machine's active
+  profile, so restore now covers both standard primary roots.
+- Keep version-1/2 bundles readable. New bundles use format version 3 with the
+  same AES-256 entry encryption, allowlist, safety copy, rollback and hash
+  verification.
+- Surface the component totals from an inspected Codex migration ZIP so the
+  restore screen explicitly shows whether the selected archive contains local
+  project files. This is evidence of the file-level restore only; it must not
+  claim that the Desktop Project sidebar or cloud project state was recreated.
+
 ## 2026-10-05: ChatGPT project-local data in Codex migration
 
 - Detect `.chatgpt-projects` beneath supported `.codex` accounts. Its files

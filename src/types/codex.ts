@@ -111,6 +111,7 @@ export interface CodexMigrationCreated { archivePath: string; archiveBytes: numb
 export interface CodexMigrationArchive { name: string; bytes: number; modifiedAt: number | null; }
 export interface CodexMigrationArchives { directory: string; archives: CodexMigrationArchive[]; totalBytes: number; }
 export interface CodexMigrationRestorePreview { token: string; items: Array<{ accountLabel: string; path: string; archivePath: string; status: "new" | "identical" | "conflict"; bytes: number }>; }
+export interface CodexMigrationRestoreProgress { stage: "queued" | "checking-processes" | "archive-validation" | "destination-check" | "safety-scan" | "safety-backup" | "safety-validation" | "removing" | "restoring" | "rollback" | "completed"; completed: number; total: number; file?: string | null; bytesCopied?: number | null; fileBytes?: number | null; operation?: "prepare-target" | "open-target" | "read-archive" | "copy-file" | "flush-file" | "close-file" | "verify-file" | "verify-size" | "verify-seek" | "verify-read" | "verify-digest" | "check-target" | "create-parent" | "recheck-target" | "copy-read" | "copy-write" | null; }
 export interface CodexMigrationRestored { restored: number; skipped: number; errors: string[]; rollbackRemaining: number; safetyArchive: string | null; }
 export interface CodexProcessResult { terminated: number; }
 

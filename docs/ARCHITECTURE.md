@@ -80,14 +80,59 @@ outside it; missing or malformed markers abort the change.
 
 ## Codex Migration
 
+Inspection caches the strictly validated manifest with the ZIP digest. Preview
+and restore recheck that digest under a held Windows read lock rather than
+decompressing the unchanged ZIP repeatedly. Replacement safety discovery uses
+known archive targets plus bounded chat trees/root databases; excluded runtime
+trees are pruned before descent. Safety ZIPs use Stored entries and are fully
+verified before deleting originals. Restore reports stages and actual file
+counts through a per-invocation Tauri channel; unknown totals are indeterminate.
+File restoration also reports the current relative filename and I/O substep.
+Production restore enqueues these phase/count records (no file contents) for
+`platform::app_data_dir()/logs/codex-restore-*.jsonl`. It creates the log/worker
+before mutations; a separate worker owns only that log. The restore thread
+serializes complete JSON/newline records and uses non-waiting `try_send` to a
+1024-record queue. Full/disconnected queues discard diagnostics and count gaps
+in the next accepted record's `droppedRecords`; disk errors stop only logging.
+Restore/rollback/completion never join the diagnostic worker. A stalled worker
+can remain until process exit, and trailing records can be delayed/lost.
+Trace pairs distinguish entry to the native notification callback from its
+return; producer timestamps do not promise disk/browser receipt. Incomplete
+logs no longer indicate where native restore stopped. Path preparation marks checking,
+mkdir and rechecking, with each ancestor's pre-metadata path in diagnostic-only
+`check-path` events. A separate UI-only worker takes the latest progress every
+100ms, releasing its state mutex before sending to the channel. A final update
+can therefore reach the UI during an I/O wait without another native event;
+channel sends and worker joins never hold the data worker. The frontend ignores
+late channel events after the command settles and derives completion from its
+result. The static restore inventory is memoized independently of progress.
+Restore and rollback copy through a 64KiB buffer, retaining interrupted-read
+retry, partial-write handling and ZIP end-of-stream validation. Native events
+distinguish the next source read from destination write and report only bytes
+whose write returned, alongside the manifest size. Those bytes are not verified
+until the subsequent destination SHA check completes.
+Destination files use normal OS writeback: copy, verify length and SHA through
+the same read/write handle, then close, in both restore and rollback. Windows
+sharing allows reads but denies competing writes/deletes until verification
+finishes. Verification seeks to zero and reads exactly the expected byte count;
+it does not reopen the destination or omit the actual-byte SHA check. Traces
+identify size, seek, read and digest boundaries. Per-file forced disk sync was
+removed after the target trace ended at that notification; a subsequent run also
+stalled during post-close verification, so the reopen path was removed. Both ZIP
+creation paths still sync and safety is strictly verified before deletions.
+Matching destination hashes confirm readable bytes, not physical persistence
+through sudden power loss; retain the source/safety archives until verified.
+
 `codex_migration.rs` is a separate strict ZIP workflow for the current user's
 direct `.codex` and `.codex-*` folders. It snapshots selected account,
 project-local, and other durable-state components through narrow commands,
-validates the complete SHA-256 inventory, and restores only create-new files
-to matching folder names by default. An
-explicit replace-chat mode snapshots the target's allowlisted chat files into a
-verified safety ZIP, then replaces the complete chat snapshot; it never merges
-SQLite or chooses files by timestamp. It never copies official CLI
+validates the complete SHA-256 inventory, and overwrites archived supported
+files in matching folder names after `REPLACE CODEX` and a verified safety ZIP.
+The chat component uses complete snapshot replacement to remove stale SQLite
+WAL/SHM; other destination-only files are kept. Rollback tracks only removed
+originals and attempts each even if another cannot be recovered. The legacy
+create-only command mode remains readable but is no longer offered by the
+migration page. It never merges SQLite or chooses files by timestamp. It never copies official CLI
 authentication, machine identity, runtime cache or sandbox data.
 The project-local component transfers `.chatgpt-projects` metadata,
 instructions and sources only; it does not promise to recreate cloud project
@@ -147,6 +192,12 @@ The configuration archive list exposes only direct regular
 `sourcetree-config-<timestamp>.zip` files in the Companion bundle directory;
 reveal and delete revalidate that narrow name and reject links or arbitrary
 paths.
+
+SourceTree configuration migration writes each bundled primary file to both
+standard Local/Roaming `Atlassian/SourceTree` roots. The source profile in a v3
+manifest is provenance, not destination authority; `user.config` is selected
+independently for the installed target. Each physical target has a unique
+safety-copy path and is hash-verified after replacement.
 
 ## Phase 3 XAMPP files boundary
 

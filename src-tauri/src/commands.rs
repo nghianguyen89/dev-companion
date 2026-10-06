@@ -596,9 +596,65 @@ pub async fn restore_codex_migration(
     token: String,
     confirmation: String,
     replace_chat: bool,
+    on_progress: tauri::ipc::Channel<crate::codex_migration::RestoreProgress>,
 ) -> Result<crate::codex_migration::Restored, String> {
-    run_blocking(move || crate::codex_migration::restore(&token, &confirmation, replace_chat))
-        .await?
+    let reporter = start_restore_progress(on_progress)?;
+    reporter.record(crate::codex_migration::RestoreProgress {
+        stage: "queued".into(),
+        completed: 0,
+        total: 0,
+        file: None,
+        operation: None,
+        ..Default::default()
+    });
+    run_blocking(move || {
+        crate::codex_migration::restore(&token, &confirmation, replace_chat, &|progress| {
+            reporter.record(progress);
+        })
+    })
+    .await?
+}
+struct RestoreProgressReporter {
+    latest: std::sync::Arc<std::sync::Mutex<Option<crate::codex_migration::RestoreProgress>>>,
+    _stop: std::sync::mpsc::Sender<()>,
+    _worker: std::thread::JoinHandle<()>,
+}
+impl RestoreProgressReporter {
+    fn record(&self, progress: crate::codex_migration::RestoreProgress) {
+        if progress.operation.as_deref() != Some("check-path") {
+            if let Ok(mut latest) = self.latest.lock() {
+                *latest = Some(progress);
+            }
+        }
+    }
+}
+fn start_restore_progress(
+    channel: tauri::ipc::Channel<crate::codex_migration::RestoreProgress>,
+) -> Result<RestoreProgressReporter, String> {
+    let latest = std::sync::Arc::new(std::sync::Mutex::new(None));
+    let state = std::sync::Arc::clone(&latest);
+    let (stop, stopped) = std::sync::mpsc::channel::<()>();
+    let worker = std::thread::Builder::new()
+        .name("codex-restore-ui".into())
+        .spawn(move || loop {
+            let event = state.lock().ok().and_then(|mut latest| latest.take());
+            if let Some(event) = event {
+                let _ = channel.send(event); // Never hold the state lock during transport.
+            }
+            if !matches!(
+                stopped.recv_timeout(std::time::Duration::from_millis(100)),
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout)
+            ) {
+                break;
+            }
+        })
+        .map_err(|error| format!("Cannot start restore progress observer: {error}"))?;
+    // Dropping stop ends this UI-only worker; native completion never joins it.
+    Ok(RestoreProgressReporter {
+        latest,
+        _stop: stop,
+        _worker: worker,
+    })
 }
 #[tauri::command]
 pub async fn stop_codex_processes(
@@ -768,6 +824,56 @@ mod tests {
         thread,
         time::Duration,
     };
+
+    #[test]
+    fn restore_observer_flushes_latest_without_holding_the_data_worker() {
+        let (entered_tx, entered_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let release = std::sync::Mutex::new(Some(release_rx));
+        let (sent_tx, sent_rx) = mpsc::channel();
+        let channel = tauri::ipc::Channel::new(move |body| {
+            let first = release.lock().unwrap().take();
+            if let Some(first) = first {
+                entered_tx.send(()).unwrap();
+                first.recv().unwrap();
+            }
+            let tauri::ipc::InvokeResponseBody::Json(json) = body else {
+                panic!("Expected JSON progress")
+            };
+            let event: serde_json::Value = serde_json::from_str(&json).unwrap();
+            sent_tx.send(event["completed"].as_u64().unwrap()).unwrap();
+            Ok(())
+        });
+        let event = |completed, operation: &str| crate::codex_migration::RestoreProgress {
+            stage: "restoring".into(),
+            completed,
+            total: 618,
+            operation: Some(operation.into()),
+            ..Default::default()
+        };
+        let reporter = start_restore_progress(channel).unwrap();
+        reporter.record(event(563, "copy-file"));
+        entered_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        let (recorded_tx, recorded_rx) = mpsc::channel();
+        let producer = thread::spawn(move || {
+            for count in 564..=608 {
+                reporter.record(event(count, "copy-write"));
+            }
+            reporter.record(event(999, "check-path"));
+            recorded_tx.send(()).unwrap();
+            reporter
+        });
+        let recorded_while_transport_blocked = recorded_rx.recv_timeout(Duration::from_secs(5));
+        release_tx.send(()).unwrap();
+        let reporter = producer.join().unwrap();
+        let first = sent_rx.recv_timeout(Duration::from_secs(5));
+        let last = sent_rx.recv_timeout(Duration::from_secs(5));
+        drop(reporter._stop);
+        reporter._worker.join().unwrap();
+        assert!(recorded_while_transport_blocked.is_ok());
+        assert_eq!(first.unwrap(), 563);
+        assert_eq!(last.unwrap(), 608); // No new native event after608 was needed to flush it.
+    }
 
     #[test]
     fn runs_work_on_a_blocking_thread() {

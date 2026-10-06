@@ -17,10 +17,15 @@ pub fn linked(metadata: &fs::Metadata) -> bool {
 
 /// Inspect every existing ancestor, including CODEX_HOME itself. Never follow reparse points.
 pub fn check(path: &Path) -> Result<(), String> {
+    check_with_progress(path, &|_| {})
+}
+
+pub fn check_with_progress(path: &Path, progress: &dyn Fn(&Path)) -> Result<(), String> {
     if !path.is_absolute() || path.components().any(|c| matches!(c, Component::ParentDir)) {
         return Err("Rejected unsafe non-absolute path.".into());
     }
     for ancestor in path.ancestors() {
+        progress(ancestor);
         match fs::symlink_metadata(ancestor) {
             Ok(m) if linked(&m) => return Err("Rejected symbolic link or junction.".into()),
             Ok(_) => (),

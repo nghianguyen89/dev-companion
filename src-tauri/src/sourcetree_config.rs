@@ -109,7 +109,15 @@ struct Bundle {
     sensitive: bool,
     #[serde(default)]
     encryption: Option<String>,
+    #[serde(default)]
+    profile: Option<ConfigProfile>,
     files: Vec<Entry>,
+}
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+enum ConfigProfile {
+    Local,
+    Roaming,
 }
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -127,7 +135,7 @@ struct Source {
 }
 #[derive(Clone)]
 enum Plan {
-    Create(Vec<Source>),
+    Create(Vec<Source>, ConfigProfile),
     Inspect {
         path: PathBuf,
         hash: String,
@@ -207,54 +215,32 @@ fn roaming_atlassian() -> Result<PathBuf> {
         .map(|path| path.join("Atlassian"))
         .ok_or_else(|| "Cannot locate Windows AppData.".into())
 }
-fn config_activity(root: &Path) -> Option<std::time::SystemTime> {
-    CONFIG_FILES
-        .iter()
-        .filter_map(|(_, relative)| fs::metadata(root.join("SourceTree").join(relative)).ok())
-        .filter_map(|metadata| metadata.modified().ok())
-        .max()
-}
-fn config_root_at(local: &Path, roaming: &Path) -> PathBuf {
-    match (config_activity(local), config_activity(roaming)) {
-        (Some(local_time), Some(roaming_time)) if roaming_time >= local_time => {
-            roaming.join("SourceTree")
-        }
-        (Some(_), Some(_)) | (Some(_), None) | (None, None) => local.join("SourceTree"),
-        (None, Some(_)) => roaming.join("SourceTree"),
-    }
-}
-fn config_root() -> Result<PathBuf> {
-    Ok(config_root_at(&local_atlassian()?, &roaming_atlassian()?))
-}
-fn user_config() -> Option<(PathBuf, String)> {
-    let roots = [local_atlassian().ok()?, roaming_atlassian().ok()?];
+fn user_config_at(root: &Path) -> Option<(PathBuf, String)> {
     let mut candidates = Vec::new();
-    for root in roots {
-        let Ok(apps) = fs::read_dir(&root) else {
+    let Ok(apps) = fs::read_dir(root) else {
+        return None;
+    };
+    for app in apps.flatten() {
+        let name = app.file_name().to_string_lossy().into_owned();
+        if !name.starts_with("SourceTree.exe_Url_") || fs_safety::check(&app.path()).is_err() {
+            continue;
+        }
+        let Ok(versions) = fs::read_dir(app.path()) else {
             continue;
         };
-        for app in apps.flatten() {
-            let name = app.file_name().to_string_lossy().into_owned();
-            if !name.starts_with("SourceTree.exe_Url_") || fs_safety::check(&app.path()).is_err() {
-                continue;
-            }
-            let Ok(versions) = fs::read_dir(app.path()) else {
-                continue;
-            };
-            for version in versions.flatten() {
-                let path = version.path().join("user.config");
-                if let Ok(metadata) = fs::symlink_metadata(&path) {
-                    if metadata.is_file() && !fs_safety::linked(&metadata) {
-                        candidates.push((
-                            metadata.modified().ok(),
-                            path,
-                            format!(
-                                "{}/{}/user.config",
-                                name,
-                                version.file_name().to_string_lossy()
-                            ),
-                        ));
-                    }
+        for version in versions.flatten() {
+            let path = version.path().join("user.config");
+            if let Ok(metadata) = fs::symlink_metadata(&path) {
+                if metadata.is_file() && !fs_safety::linked(&metadata) {
+                    candidates.push((
+                        metadata.modified().ok(),
+                        path,
+                        format!(
+                            "{}/{}/user.config",
+                            name,
+                            version.file_name().to_string_lossy()
+                        ),
+                    ));
                 }
             }
         }
@@ -264,12 +250,38 @@ fn user_config() -> Option<(PathBuf, String)> {
         .max_by_key(|item| item.0)
         .map(|(_, path, relative)| (path, relative))
 }
-fn source_files() -> Result<(Vec<Source>, Vec<String>)> {
-    let root = config_root()?;
+fn current_user_config_at(local: &Path, roaming: &Path) -> Option<(PathBuf, String)> {
+    [local, roaming]
+        .into_iter()
+        .filter_map(user_config_at)
+        .max_by_key(|(path, _)| {
+            fs::metadata(path)
+                .ok()
+                .and_then(|metadata| metadata.modified().ok())
+        })
+}
+fn source_files() -> Result<(Vec<Source>, Vec<String>, ConfigProfile)> {
+    let local = local_atlassian()?;
+    let roaming = roaming_atlassian()?;
+    let local_root = local.join("SourceTree");
+    let roaming_root = roaming.join("SourceTree");
+    let profile = if local_root.join("bookmarks.xml").is_file()
+        || !roaming_root.join("bookmarks.xml").is_file()
+    {
+        ConfigProfile::Local
+    } else {
+        ConfigProfile::Roaming
+    };
     let mut found = Vec::new();
     let mut missing = Vec::new();
     for (name, relative) in CONFIG_FILES {
-        let path = root.join(relative);
+        let local_path = local_root.join(relative);
+        let roaming_path = roaming_root.join(relative);
+        let path = if local_path.is_file() {
+            local_path
+        } else {
+            roaming_path
+        };
         if path.exists() {
             let (sha256, bytes) = hash_file(&path)?;
             found.push(Source {
@@ -286,7 +298,7 @@ fn source_files() -> Result<(Vec<Source>, Vec<String>)> {
             missing.push(name.into());
         }
     }
-    if let Some((path, relative)) = user_config() {
+    if let Some((path, relative)) = current_user_config_at(&local, &roaming) {
         let (sha256, bytes) = hash_file(&path)?;
         found.push(Source {
             entry: Entry {
@@ -304,7 +316,7 @@ fn source_files() -> Result<(Vec<Source>, Vec<String>)> {
     if found.is_empty() {
         return Err("No supported SourceTree configuration files were found.".into());
     }
-    Ok((found, missing))
+    Ok((found, missing, profile))
 }
 fn info(files: &[Entry]) -> Vec<FileInfo> {
     files
@@ -331,12 +343,15 @@ fn valid_destination(value: &str, name: &str) -> bool {
         && value.split('/').count() == 3
 }
 fn validate(bundle: &Bundle) -> Result<()> {
-    let encrypted = bundle.format_version == 2 && bundle.encryption.as_deref() == Some("aes-256");
-    if !matches!(bundle.format_version, 1 | 2)
+    let encrypted =
+        matches!(bundle.format_version, 2 | 3) && bundle.encryption.as_deref() == Some("aes-256");
+    if !matches!(bundle.format_version, 1 | 2 | 3)
         || bundle.kind != "dev-companion-sourcetree-config"
         || !bundle.sensitive
         || (bundle.format_version == 1 && bundle.encryption.is_some())
-        || (bundle.format_version == 2 && !encrypted)
+        || (matches!(bundle.format_version, 2 | 3) && !encrypted)
+        || (bundle.format_version == 3 && bundle.profile.is_none())
+        || (bundle.format_version < 3 && bundle.profile.is_some())
         || bundle.files.is_empty()
         || bundle.files.len() > CONFIG_FILES.len() + 1
     {
@@ -390,14 +405,14 @@ fn aes256_entry<R: Read + Seek>(archive: &mut ZipArchive<R>, name: &str) -> Resu
 
 pub fn preview() -> Result<Preview> {
     sourcetree::require_closed()?;
-    let (sources, missing) = source_files()?;
+    let (sources, missing, profile) = source_files()?;
     let files = sources
         .iter()
         .map(|source| source.entry.clone())
         .collect::<Vec<_>>();
     let bytes = files.iter().map(|file| file.bytes).sum();
     Ok(Preview {
-        token: put(Plan::Create(sources)),
+        token: put(Plan::Create(sources, profile)),
         files: info(&files),
         missing,
         bytes,
@@ -407,11 +422,11 @@ pub fn preview() -> Result<Preview> {
 pub fn create(token: &str, password: &str) -> Result<Created> {
     sourcetree::require_closed()?;
     validate_password(password)?;
-    let Plan::Create(sources) = get(token)? else {
+    let Plan::Create(sources, profile) = get(token)? else {
         return Err("Preview SourceTree configuration first.".into());
     };
-    let (current, _) = source_files()?;
-    if current != sources {
+    let (current, _, current_profile) = source_files()?;
+    if current != sources || current_profile != profile {
         return Err("SourceTree configuration changed; preview again.".into());
     }
     let output = platform::personal_bundle_dir();
@@ -428,11 +443,12 @@ pub fn create(token: &str, password: &str) -> Result<Created> {
             .open(&path)
             .map_err(|_| "Cannot create the SourceTree configuration bundle.")?;
         let manifest = Bundle {
-            format_version: 2,
+            format_version: 3,
             kind: "dev-companion-sourcetree-config".into(),
             created_at: timestamp()?,
             sensitive: true,
             encryption: Some("aes-256".into()),
+            profile: Some(profile),
             files: sources.iter().map(|source| source.entry.clone()).collect(),
         };
         let mut zip = ZipWriter::new(file);
@@ -630,7 +646,7 @@ fn read_bundle(path: &Path, password: &str) -> Result<Bundle> {
     let bundle: Bundle = serde_json::from_slice(&manifest)
         .map_err(|_| "Invalid SourceTree configuration bundle manifest.")?;
     validate(&bundle)?;
-    if bundle.format_version == 2 && !manifest_encrypted {
+    if matches!(bundle.format_version, 2 | 3) && !manifest_encrypted {
         return Err("SourceTree configuration bundle is not AES-256 encrypted.".into());
     }
     let mut expected = HashSet::from([MANIFEST.to_owned()]);
@@ -642,7 +658,9 @@ fn read_bundle(path: &Path, password: &str) -> Result<Bundle> {
             .map_err(|_| {
                 "Cannot decrypt the SourceTree configuration bundle. Check its password."
             })?;
-        if file.is_dir() || file.size() != entry.bytes || (bundle.format_version == 2 && !encrypted)
+        if file.is_dir()
+            || file.size() != entry.bytes
+            || (matches!(bundle.format_version, 2 | 3) && !encrypted)
         {
             return Err("SourceTree configuration bundle has an invalid entry.".into());
         }
@@ -707,21 +725,44 @@ fn targets_at(root: &Path, bundle: &Bundle) -> Result<Vec<(Entry, PathBuf)>> {
         })
         .collect()
 }
-fn targets(bundle: &Bundle) -> Result<Vec<(Entry, PathBuf)>> {
-    let root = config_root()?;
-    let atlassian = root
-        .parent()
-        .ok_or("Invalid SourceTree configuration root.")?;
-    let mut targets = targets_at(atlassian, bundle)?;
-    if let Some((path, _)) = user_config() {
-        for (entry, target) in &mut targets {
-            if entry.name == "user.config" {
-                *target = path.clone();
-                fs_safety::check(target)?;
+fn targets_for_at(local: &Path, roaming: &Path, bundle: &Bundle) -> Result<Vec<(Entry, PathBuf)>> {
+    let mut targets = Vec::new();
+    for entry in &bundle.files {
+        if entry.name == "user.config" {
+            if let Some((path, _)) = current_user_config_at(local, roaming) {
+                fs_safety::check(&path)?;
+                targets.push((entry.clone(), path));
+            } else {
+                let root = match bundle.profile.unwrap_or(ConfigProfile::Local) {
+                    ConfigProfile::Local => local,
+                    ConfigProfile::Roaming => roaming,
+                };
+                targets.extend(targets_at(
+                    root,
+                    &Bundle {
+                        files: vec![entry.clone()],
+                        ..bundle.clone()
+                    },
+                )?);
             }
+        } else {
+            targets.push((
+                entry.clone(),
+                local.join("SourceTree").join(&entry.destination),
+            ));
+            targets.push((
+                entry.clone(),
+                roaming.join("SourceTree").join(&entry.destination),
+            ));
         }
     }
+    for (_, target) in &targets {
+        fs_safety::check(target)?;
+    }
     Ok(targets)
+}
+fn targets(bundle: &Bundle) -> Result<Vec<(Entry, PathBuf)>> {
+    targets_for_at(&local_atlassian()?, &roaming_atlassian()?, bundle)
 }
 pub fn preview_recovery(token: &str, password: &str) -> Result<RecoveryPreview> {
     sourcetree::require_closed()?;
@@ -764,12 +805,65 @@ pub fn recover(token: &str, confirmation: &str, password: &str) -> Result<Recove
     let file = File::open(&path).map_err(|_| "Cannot read the SourceTree configuration bundle.")?;
     let mut archive =
         ZipArchive::new(file).map_err(|_| "Invalid SourceTree configuration bundle.")?;
+    let restored_files = restore_targets(targets, &safety, |entry, target| {
+        let mut input = archive
+            .by_name_decrypt(&entry.archive_path, password.as_bytes())
+            .map_err(|_| {
+                "Cannot decrypt the SourceTree configuration bundle. Check its password."
+            })?;
+        replace_target(entry, target, &mut input)
+    })?;
+    Ok(RecoveryResult {
+        restored: restored_files.len() as u32,
+        safety_copy_path: safety.display().to_string(),
+        files: restored_files,
+    })
+}
+fn replace_target<R: Read>(entry: &Entry, target: &Path, input: &mut R) -> Result<()> {
+    let temporary = target.with_extension("dev-companion.tmp");
+    let mut owns_temporary = false;
+    let result = (|| -> Result<()> {
+        let mut output = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temporary)
+            .map_err(|_| "Cannot prepare SourceTree restore.")?;
+        owns_temporary = true;
+        std::io::copy(input, &mut output)
+            .map_err(|_| "Cannot restore SourceTree configuration.")?;
+        output
+            .sync_all()
+            .map_err(|_| "Cannot restore SourceTree configuration.")?;
+        if target.exists() {
+            fs::remove_file(target).map_err(|_| "Cannot replace SourceTree configuration.")?;
+        }
+        fs::rename(&temporary, target).map_err(|_| "Cannot finalize SourceTree restore.")?;
+        if hash_file(target)? != (entry.sha256.clone(), entry.bytes) {
+            return Err("SourceTree restore verification failed.".into());
+        }
+        Ok(())
+    })();
+    if result.is_err() && owns_temporary {
+        let _ = fs::remove_file(temporary);
+    }
+    result
+}
+fn restore_targets<F>(
+    targets: Vec<(Entry, PathBuf)>,
+    safety: &Path,
+    mut write: F,
+) -> Result<Vec<RestoredFile>>
+where
+    F: FnMut(&Entry, &Path) -> Result<()>,
+{
     let mut written: Vec<(PathBuf, Option<PathBuf>)> = Vec::new();
     let mut restored_files = Vec::new();
     let result = (|| -> Result<()> {
-        for (entry, target) in targets {
+        for (index, (entry, target)) in targets.into_iter().enumerate() {
             let backup = if target.exists() {
-                let path = safety.join(&entry.name);
+                let path = safety.join(index.to_string()).join(&entry.name);
+                fs::create_dir_all(path.parent().ok_or("Invalid SourceTree safety path.")?)
+                    .map_err(|_| "Cannot create SourceTree safety copy.")?;
                 fs::copy(&target, &path).map_err(|_| "Cannot save SourceTree safety copy.")?;
                 Some(path)
             } else {
@@ -777,30 +871,8 @@ pub fn recover(token: &str, confirmation: &str, password: &str) -> Result<Recove
             };
             let parent = target.parent().ok_or("Invalid SourceTree destination.")?;
             fs::create_dir_all(parent).map_err(|_| "Cannot create SourceTree destination.")?;
-            let temporary = target.with_extension("dev-companion.tmp");
-            let mut output = OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&temporary)
-                .map_err(|_| "Cannot prepare SourceTree restore.")?;
-            let mut input = archive
-                .by_name_decrypt(&entry.archive_path, password.as_bytes())
-                .map_err(|_| {
-                    "Cannot decrypt the SourceTree configuration bundle. Check its password."
-                })?;
-            std::io::copy(&mut input, &mut output)
-                .map_err(|_| "Cannot restore SourceTree configuration.")?;
-            output
-                .sync_all()
-                .map_err(|_| "Cannot restore SourceTree configuration.")?;
             written.push((target.clone(), backup.clone()));
-            if target.exists() {
-                fs::remove_file(&target).map_err(|_| "Cannot replace SourceTree configuration.")?;
-            }
-            fs::rename(&temporary, &target).map_err(|_| "Cannot finalize SourceTree restore.")?;
-            if hash_file(&target)? != (entry.sha256.clone(), entry.bytes) {
-                return Err("SourceTree restore verification failed.".into());
-            }
+            write(&entry, &target)?;
             restored_files.push(RestoredFile {
                 name: entry.name,
                 destination: target.display().to_string(),
@@ -810,19 +882,25 @@ pub fn recover(token: &str, confirmation: &str, password: &str) -> Result<Recove
         Ok(())
     })();
     if let Err(error) = result {
+        let mut rollback_failures = 0;
         for (target, backup) in written.into_iter().rev() {
-            let _ = fs::remove_file(&target);
+            let mut failed = target.exists() && fs::remove_file(&target).is_err();
             if let Some(backup) = backup {
-                let _ = fs::copy(backup, target);
+                failed |= fs::copy(backup, target).is_err();
             }
+            if failed {
+                rollback_failures += 1;
+            }
+        }
+        if rollback_failures > 0 {
+            return Err(format!(
+                "{error} Rollback incomplete for {rollback_failures} target(s); safety copies remain at {}.",
+                safety.display()
+            ));
         }
         return Err(error);
     }
-    Ok(RecoveryResult {
-        restored: bundle.files.len() as u32,
-        safety_copy_path: safety.display().to_string(),
-        files: restored_files,
-    })
+    Ok(restored_files)
 }
 pub fn delete(token: &str, confirmation: &str) -> Result<()> {
     if confirmation != "DELETE" {
@@ -950,6 +1028,7 @@ mod tests {
             created_at: "2026-10-03T00:00:00Z".into(),
             sensitive: true,
             encryption: Some("aes-256".into()),
+            profile: None,
             files: vec![entry.clone()],
         };
         assert!(validate(&encrypted).is_ok());
@@ -972,6 +1051,7 @@ mod tests {
             created_at: "2026-10-03T00:00:00Z".into(),
             sensitive: true,
             encryption: Some("aes-256".into()),
+            profile: None,
             files: ["bookmarks.xml", "opentabs.xml", "passwd", "userhosts"]
                 .into_iter()
                 .map(|name| Entry {
@@ -1002,18 +1082,220 @@ mod tests {
     }
 
     #[test]
-    fn uses_roaming_configuration_when_it_is_the_active_profile() {
+    fn restore_targets_both_profiles_despite_stale_files_and_source_profile() {
         let root = std::env::temp_dir().join(format!(
-            "companion-sourcetree-config-roaming-{}",
+            "companion-sourcetree-config-restore-profile-{}",
             time::OffsetDateTime::now_utc().unix_timestamp_nanos()
         ));
         let local = root.join("local");
         let roaming = root.join("roaming");
-        fs::create_dir_all(roaming.join("SourceTree")).unwrap();
-        fs::write(roaming.join("SourceTree/bookmarks.xml"), "bookmarks").unwrap();
+        fs::create_dir_all(local.join("SourceTree")).unwrap();
+        fs::write(local.join("SourceTree/bookmarks.xml"), "stale").unwrap();
+        let app = roaming.join("SourceTree.exe_Url_target/3.4.0.0");
+        fs::create_dir_all(&app).unwrap();
+        fs::write(app.join("user.config"), "target installation").unwrap();
+        let bundle = Bundle {
+            format_version: 3,
+            kind: "dev-companion-sourcetree-config".into(),
+            created_at: "2026-10-05T00:00:00Z".into(),
+            sensitive: true,
+            encryption: Some("aes-256".into()),
+            profile: Some(ConfigProfile::Local),
+            files: ["bookmarks.xml", "opentabs.xml", "passwd", "userhosts"]
+                .into_iter()
+                .map(|name| Entry {
+                    name: name.into(),
+                    archive_path: format!("{ROOT}{name}"),
+                    destination: name.into(),
+                    bytes: 1,
+                    sha256: "0".repeat(64),
+                })
+                .collect(),
+        };
 
-        assert_eq!(config_root_at(&local, &roaming), roaming.join("SourceTree"));
+        let restored = targets_for_at(&local, &roaming, &bundle).unwrap();
 
+        assert_eq!(
+            restored
+                .iter()
+                .map(|(_, path)| path.strip_prefix(&root).unwrap().to_path_buf())
+                .collect::<Vec<_>>(),
+            [
+                PathBuf::from("local/SourceTree/bookmarks.xml"),
+                PathBuf::from("roaming/SourceTree/bookmarks.xml"),
+                PathBuf::from("local/SourceTree/opentabs.xml"),
+                PathBuf::from("roaming/SourceTree/opentabs.xml"),
+                PathBuf::from("local/SourceTree/passwd"),
+                PathBuf::from("roaming/SourceTree/passwd"),
+                PathBuf::from("local/SourceTree/userhosts"),
+                PathBuf::from("roaming/SourceTree/userhosts"),
+            ]
+        );
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn duplicate_profile_restore_overwrites_and_rolls_back_every_target() {
+        let root = std::env::temp_dir().join(format!(
+            "companion-sourcetree-config-restore-transaction-{}",
+            time::OffsetDateTime::now_utc().unix_timestamp_nanos()
+        ));
+        let safety = root.join("safety");
+        let local = root.join("local/bookmarks.xml");
+        let roaming = root.join("roaming/bookmarks.xml");
+        fs::create_dir_all(local.parent().unwrap()).unwrap();
+        fs::create_dir_all(roaming.parent().unwrap()).unwrap();
+        fs::create_dir_all(&safety).unwrap();
+        fs::write(&local, "local-old").unwrap();
+        fs::write(&roaming, "roaming-old").unwrap();
+        let entry = Entry {
+            name: "bookmarks.xml".into(),
+            archive_path: format!("{ROOT}bookmarks.xml"),
+            destination: "bookmarks.xml".into(),
+            bytes: 3,
+            sha256: "0".repeat(64),
+        };
+
+        let restored = restore_targets(
+            vec![
+                (entry.clone(), local.clone()),
+                (entry.clone(), roaming.clone()),
+            ],
+            &safety,
+            |_, target| fs::write(target, "new").map_err(|error| error.to_string()),
+        )
+        .unwrap();
+        assert_eq!(restored.len(), 2);
+        assert_eq!(fs::read_to_string(&local).unwrap(), "new");
+        assert_eq!(fs::read_to_string(&roaming).unwrap(), "new");
+        assert_eq!(
+            fs::read_to_string(safety.join("0/bookmarks.xml")).unwrap(),
+            "local-old"
+        );
+        assert_eq!(
+            fs::read_to_string(safety.join("1/bookmarks.xml")).unwrap(),
+            "roaming-old"
+        );
+
+        fs::write(&local, "local-old").unwrap();
+        fs::write(&roaming, "roaming-old").unwrap();
+        let content = b"changed";
+        let mut good = entry.clone();
+        good.bytes = content.len() as u64;
+        good.sha256 = format!("{:x}", Sha256::digest(content));
+        let mut bad = good.clone();
+        bad.sha256 = "0".repeat(64);
+        assert!(restore_targets(
+            vec![(good, local.clone()), (bad, roaming.clone())],
+            &root.join("rollback-safety"),
+            |entry, target| replace_target(entry, target, &mut std::io::Cursor::new(content)),
+        )
+        .is_err());
+        assert_eq!(fs::read_to_string(&local).unwrap(), "local-old");
+        assert_eq!(fs::read_to_string(&roaming).unwrap(), "roaming-old");
+        assert!(!local.with_extension("dev-companion.tmp").exists());
+        assert!(!roaming.with_extension("dev-companion.tmp").exists());
+        let existing_temporary = local.with_extension("dev-companion.tmp");
+        fs::write(&existing_temporary, "other process").unwrap();
+        assert!(replace_target(&entry, &local, &mut std::io::Cursor::new(b"new")).is_err());
+        assert_eq!(
+            fs::read_to_string(existing_temporary).unwrap(),
+            "other process"
+        );
+        fs::remove_file(local.with_extension("dev-companion.tmp")).unwrap();
+        fs::write(&local, "local-old").unwrap();
+        fs::write(&roaming, "roaming-old").unwrap();
+        let mut writes = 0;
+        let incomplete_safety = root.join("incomplete-safety");
+        let error = restore_targets(
+            vec![(entry.clone(), local.clone()), (entry, roaming.clone())],
+            &incomplete_safety,
+            |_, target| {
+                writes += 1;
+                if writes == 1 {
+                    fs::write(target, "changed").map_err(|error| error.to_string())?;
+                } else {
+                    fs::remove_file(target).map_err(|error| error.to_string())?;
+                    fs::create_dir(target).map_err(|error| error.to_string())?;
+                    return Err("forced rollback obstruction".into());
+                }
+                Ok(())
+            },
+        )
+        .err()
+        .unwrap();
+        assert!(error.contains("Rollback incomplete for 1 target(s)"));
+        assert!(error.contains(&incomplete_safety.display().to_string()));
+        assert_eq!(fs::read_to_string(&local).unwrap(), "local-old");
+        assert!(roaming.is_dir());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn restore_overwrites_all_four_primary_files_in_both_profiles() {
+        let root = std::env::temp_dir().join(format!(
+            "companion-sourcetree-config-four-files-{}",
+            time::OffsetDateTime::now_utc().unix_timestamp_nanos()
+        ));
+        let safety = root.join("safety");
+        fs::create_dir_all(&safety).unwrap();
+        let mut targets = Vec::new();
+        for name in ["bookmarks.xml", "opentabs.xml", "passwd", "userhosts"] {
+            for profile in ["local", "roaming"] {
+                let target = root.join(profile).join("SourceTree").join(name);
+                fs::create_dir_all(target.parent().unwrap()).unwrap();
+                fs::write(&target, "old").unwrap();
+                targets.push((
+                    Entry {
+                        name: name.into(),
+                        archive_path: format!("{ROOT}{name}"),
+                        destination: name.into(),
+                        bytes: name.len() as u64,
+                        sha256: format!("{:x}", Sha256::digest(name.as_bytes())),
+                    },
+                    target,
+                ));
+            }
+        }
+
+        let restored = restore_targets(targets.clone(), &safety, |entry, target| {
+            replace_target(
+                entry,
+                target,
+                &mut std::io::Cursor::new(entry.name.as_bytes()),
+            )
+        })
+        .unwrap();
+
+        assert_eq!(restored.len(), 8);
+        for (entry, target) in targets {
+            assert_eq!(fs::read_to_string(target).unwrap(), entry.name);
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn version_three_bundle_requires_its_source_profile() {
+        let bundle = Bundle {
+            format_version: 3,
+            kind: "dev-companion-sourcetree-config".into(),
+            created_at: "2026-10-05T00:00:00Z".into(),
+            sensitive: true,
+            encryption: Some("aes-256".into()),
+            profile: None,
+            files: vec![Entry {
+                name: "bookmarks.xml".into(),
+                archive_path: format!("{ROOT}bookmarks.xml"),
+                destination: "bookmarks.xml".into(),
+                bytes: 1,
+                sha256: "0".repeat(64),
+            }],
+        };
+        assert!(validate(&bundle).is_err());
+        assert!(validate(&Bundle {
+            profile: Some(ConfigProfile::Local),
+            ..bundle
+        })
+        .is_ok());
     }
 }

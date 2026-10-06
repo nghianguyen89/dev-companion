@@ -1,6 +1,6 @@
 # Dev Companion 0.2.0 — hướng dẫn Windows
 
-**Chưa hoàn tất migration chat sử dụng được trong Codex Desktop.** Bản này có backup môi trường và phục hồi file không ghi đè. Chưa gộp database/index, chưa kiểm chứng chat xuất hiện và mở lại trên máy đích. Không dùng kết quả “đã phục hồi file” làm bằng chứng migration thành công.
+**Chat trên máy đích vẫn cần kiểm tra trong Codex Desktop.** Backup môi trường phục hồi file không ghi đè; mục Di chuyển tài khoản Codex chép đè file từ ZIP, gồm database/index và danh sách dự án. Công cụ không gộp database. Không dùng kết quả “đã phục hồi file” làm bằng chứng chat đã xuất hiện và mở được trên máy đích.
 
 Dev Companion hiện hỗ trợ các workflow Windows cụ thể: archive môi trường Codex,
 bundle `.bcpkg` do Beyond Compare xuất, bookmark/cấu hình cục bộ SourceTree,
@@ -74,14 +74,29 @@ profiles được lưu cùng settings cục bộ.
 4. Mục **Các bản backup đã tạo** cho biết số ZIP, thời gian và dung lượng. Có
    thể mở Explorer tại ZIP hoặc bấm **Xóa** và xác nhận để xóa đúng ZIP đó.
 5. Trên máy mới, copy ZIP vào thư mục `backups/`, rồi bấm **Khôi phục** ngay
-   trên dòng ZIP trong danh sách để kiểm tra và xem trước. Mặc định, nhập `RESTORE` để chỉ tạo
-   file còn thiếu; file giống hoặc xung đột được giữ. Nếu cần dùng snapshot từ
-   ZIP, chọn **Thay dữ liệu Codex từ backup này**, nhập `REPLACE CODEX`. Codex
-   phải đóng; Companion tạo và kiểm chứng ZIP safety dữ liệu Codex đích, rồi thay
-   dữ liệu local đã được backup. Đây không phải merge SQLite hay so sánh ngày sửa;
-   credential, cache và dữ liệu tạm không bao giờ được gồm. Đăng nhập lại Codex
-   và kiểm tra chat/project; ZIP safety có thể được chọn lại ở chính màn hình này
-   nếu cần quay về dữ liệu đích trước đó.
+   trên dòng ZIP trong danh sách để kiểm tra và xem trước. Nhập `REPLACE CODEX`,
+   rồi bấm **Thay dữ liệu Codex**: công cụ chép đè toàn bộ file trong backup,
+   gồm danh sách dự án, trạng thái và database. Codex phải đóng; Companion tạo
+   và kiểm chứng ZIP safety dữ liệu đích trước khi ghi. Snapshot chat được thay
+     hoàn toàn để tránh WAL/SHM cũ; file riêng của máy đích ở nhóm khác được giữ.
+     File đích dùng cơ chế ghi thông thường của Windows, kiểm tra kích thước và
+     SHA-256 trên cùng handle trước khi đóng; không ép đồng bộ xuống đĩa cho
+     từng file. ZIP safety vẫn được đồng
+     bộ và kiểm chứng trước khi ghi đè. Giữ ZIP nguồn/safety đến khi kiểm tra
+     Codex xong; hash khớp không bảo đảm dữ liệu đích đã xuống đĩa khi mất điện.
+   Không merge SQLite hay so sánh ngày sửa. Credential, cache và dữ liệu tạm
+   không nằm trong backup. Đăng nhập lại Codex và kiểm tra chat/project sau khi
+   phục hồi. ZIP safety được giữ tại đường dẫn hiển thị để có thể phục hồi lại
+   qua kiểm tra ZIP; danh sách backup di chuyển chỉ liệt kê ZIP di chuyển thông thường.
+
+Mỗi lần thử thay dữ liệu tạo một `codex-safety-*.zip` riêng. Sau khi đóng
+Companion, anh có thể xóa các bản safety trung gian để giảm dung lượng; giữ ZIP
+di chuyển gốc, bản safety đầu tiên và mới nhất đến khi kiểm tra phục hồi xong.
+Không xóa safety đang được dùng bởi thao tác phục hồi.
+
+Tiến độ cho biết file hiện tại, đang đọc ZIP hay ghi file đích và số byte đã ghi
+trên kích thước dự kiến. Byte đã ghi chưa thay cho bước kiểm chứng SHA-256;
+chỉ mở Codex sau khi kết quả phục hồi báo hoàn tất.
 
 ### Backup môi trường v2 cũ
 
@@ -95,7 +110,7 @@ profiles được lưu cùng settings cục bộ.
 
 - **Beyond Compare:** chọn file `.bcpkg` do `Tools > Export Settings` tạo. Companion giữ nguyên package, không chuyển license và không import tự động.
 - **SourceTree bookmark:** luồng tương thích chỉ đọc schema `bookmarks.xml` đã được kiểm chứng; phải đóng SourceTree. Repository, account, credential và license không được đưa vào bundle.
-- **SourceTree cấu hình cá nhân:** đóng SourceTree, mở trang **SourceTree**, nhập mật khẩu bundle tối thiểu 6 ký tự rồi chọn tạo bundle. Mục **Các bundle cấu hình đã tạo** cho biết tên, thời gian và dung lượng; có thể mở Explorer đúng file hoặc xóa sau khi xác nhận. Bundle AES-256 có thể gồm các file cục bộ phát hiện được: `accounts.json`, `bookmarks.xml`, `customactions.xml`, `hostedaccounts.xml`, `opentabs.xml`, `passwd`, `userhosts` và `user.config`. Khi phục hồi, bấm **Phục hồi cấu hình** ngay trên bundle cần dùng, nhập mật khẩu trong dòng bundle, chờ kiểm chứng, bấm **Xem trước phục hồi**, nhập `RESTORE` rồi bấm **Phục hồi cấu hình**; file đích có bản sao an toàn trước khi thay thế và kết quả liệt kê từng đường dẫn đã hash-verify. Tool tự chọn profile SourceTree đang hoạt động giữa `%LOCALAPPDATA%` và `%APPDATA%`. Chỉ để trống mật khẩu với bundle cũ chưa mã hóa. Windows Credential Manager, OAuth/DPAPI và SSH key không nằm trong bundle nên có thể vẫn phải đăng nhập lại.
+- **SourceTree cấu hình cá nhân:** đóng SourceTree, mở trang **SourceTree**, nhập mật khẩu bundle tối thiểu 6 ký tự rồi chọn tạo bundle. Mục **Các bundle cấu hình đã tạo** cho biết tên, thời gian và dung lượng; có thể mở Explorer đúng file hoặc xóa sau khi xác nhận. Bundle AES-256 có thể gồm các file cục bộ phát hiện được: `accounts.json`, `bookmarks.xml`, `customactions.xml`, `hostedaccounts.xml`, `opentabs.xml`, `passwd`, `userhosts` và `user.config`. Công cụ chép đè file cấu hình chính vào cả `%LOCALAPPDATA%\Atlassian\SourceTree` và `%APPDATA%\Atlassian\SourceTree`, với bản sao an toàn riêng cho từng đường dẫn, để profile đích nào cũng nhận đủ bookmarks, tabs, passwd và userhosts. `user.config` được xác định riêng theo cài đặt hiện tại; profile nguồn trong bundle chỉ dùng làm thông tin xuất xứ. Khi phục hồi, bấm **Phục hồi cấu hình** ngay trên bundle cần dùng, nhập mật khẩu trong dòng bundle, chờ kiểm chứng, bấm **Xem trước phục hồi**, nhập `RESTORE` rồi bấm **Phục hồi cấu hình**; file đích có bản sao an toàn trước khi thay thế và kết quả liệt kê từng đường dẫn đã hash-verify. Chỉ để trống mật khẩu với bundle cũ chưa mã hóa. Windows Credential Manager, OAuth/DPAPI và SSH key không nằm trong bundle nên có thể vẫn phải đăng nhập lại.
 - **XAMPP:** chọn project trực tiếp dưới `htdocs` cùng bốn file cấu hình đã duyệt. Phải dừng Apache, MariaDB và process liên quan; binary, thư mục dữ liệu MariaDB, secret và log bị loại. Placement và import MariaDB vẫn thủ công.
 
 ## Kỹ năng, thú cưng và nén tệp

@@ -11,6 +11,8 @@ it("renders the multi-account migration choices and a guarded restore", () => {
   expect(html).toContain("Worktrees with uncommitted code");
   expect(html).toContain("Estimated backup input");
   expect(html).toContain("Migration backups");
+  expect(html).toContain("Migration overwrites backed-up files");
+  expect(html).not.toContain("Existing files are kept by default");
   expect(html).not.toContain("Choose migration ZIP");
   expect(html).not.toContain("Restore on this machine");
 });

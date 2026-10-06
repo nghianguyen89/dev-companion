@@ -1,5 +1,5 @@
-import { invoke as invokeNative } from "@tauri-apps/api/core";
-import type { AppConfiguration, BackupStorageOverview, BeyondCompareBundleInspection, BeyondCompareBundlePreview, BeyondCompareReadiness, BeyondCompareRecoveryPreview, CodexContentActionResult, CodexEnvironmentActionResult, CodexEnvironmentInput, CodexEnvironmentInstructions, CodexEnvironmentOverview, CodexMigrationArchives, CodexMigrationCreated, CodexMigrationGroup, CodexMigrationOverview, CodexMigrationPreview, CodexMigrationRestorePreview, CodexMigrationRestored, CodexPaths, CodexPetsOverview, CodexSkillsOverview, CompressionCommandPreview, CompressionConfig, CompressionReadiness, CompressionSourceTree, ConversationDiscovery, DeletePreview, DeleteResult, DiagnosticsSnapshot, FileTransferCommandPreview, FileTransferConfig, FileTransferDirectoryListing, FileTransferHistoryEntry, FileTransferReadiness, SourceTreeInspection, SourceTreePreview, SourceTreeReadiness, SourceTreeRecoveryPreview, XamppInspection, XamppPreview, XamppReadiness, XamppRecoveryPreview } from "../types/codex";
+import { Channel, invoke as invokeNative } from "@tauri-apps/api/core";
+import type { AppConfiguration, BackupStorageOverview, BeyondCompareBundleInspection, BeyondCompareBundlePreview, BeyondCompareReadiness, BeyondCompareRecoveryPreview, CodexContentActionResult, CodexEnvironmentActionResult, CodexEnvironmentInput, CodexEnvironmentInstructions, CodexEnvironmentOverview, CodexMigrationArchives, CodexMigrationCreated, CodexMigrationGroup, CodexMigrationOverview, CodexMigrationPreview, CodexMigrationRestorePreview, CodexMigrationRestoreProgress, CodexMigrationRestored, CodexPaths, CodexPetsOverview, CodexSkillsOverview, CompressionCommandPreview, CompressionConfig, CompressionReadiness, CompressionSourceTree, ConversationDiscovery, DeletePreview, DeleteResult, DiagnosticsSnapshot, FileTransferCommandPreview, FileTransferConfig, FileTransferDirectoryListing, FileTransferHistoryEntry, FileTransferReadiness, SourceTreeInspection, SourceTreePreview, SourceTreeReadiness, SourceTreeRecoveryPreview, XamppInspection, XamppPreview, XamppReadiness, XamppRecoveryPreview } from "../types/codex";
 
 export const isTauriRuntime = () => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 const browserPreviewConfiguration: AppConfiguration = { theme: "system", portableMode: false, createSafetyBackups: true, language: "en", logLevel: "warn", codexEnvironments: [], fileTransferProfiles: [] };
@@ -71,7 +71,15 @@ export const deleteCodexMigrationArchive = (name: string): Promise<void> => invo
 export const inspectCodexMigrationArchive = (name: string): Promise<CodexMigrationPreview> => invoke("inspect_codex_migration_archive", { name });
 export const inspectCodexMigration = (): Promise<CodexMigrationPreview | null> => invoke("inspect_codex_migration");
 export const previewCodexMigrationRestore = (token: string): Promise<CodexMigrationRestorePreview> => invoke("preview_codex_migration_restore", { token });
-export const restoreCodexMigration = (token: string, confirmation: string, replaceChat: boolean): Promise<CodexMigrationRestored> => invoke("restore_codex_migration", { token, confirmation, replaceChat });
+export const restoreCodexMigration = async (token: string, confirmation: string, replaceChat: boolean, onProgress?: (progress: CodexMigrationRestoreProgress) => void): Promise<CodexMigrationRestored> => {
+  let active = true;
+  const channel = new Channel<CodexMigrationRestoreProgress>((progress) => { if (active) onProgress?.(progress); });
+  try {
+    return await invoke("restore_codex_migration", { token, confirmation, replaceChat, onProgress: channel });
+  } finally {
+    active = false;
+  }
+};
 export const stopCodexProcesses = (): Promise<import("../types/codex").CodexProcessResult> => invoke("stop_codex_processes", { confirmation: "CLOSE CODEX" });
 export const getFileTransferReadiness = (): Promise<FileTransferReadiness> => invoke("get_file_transfer_readiness");
 export const listFileTransferDirectory = (path: string): Promise<FileTransferDirectoryListing> => invoke("list_file_transfer_directory", { path });

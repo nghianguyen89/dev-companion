@@ -26,9 +26,10 @@ Release/version: 0.2.0
 - Codex Migration: scans the current user's direct `.codex` and `.codex-*`
   accounts, creates one strict SHA-256 ZIP with selected account,
   `.chatgpt-projects` project-local and other durable-state content,
-  and restores only missing files into matching account folders by default.
-  An explicit replace-chat mode creates a verified target safety ZIP, then
-  replaces the complete allowlisted chat snapshot; it never merges SQLite or
+  and overwrites archived files into matching account folders after
+  `REPLACE CODEX` and a verified target safety ZIP. This includes project/global
+  state; the chat snapshot is replaced completely to remove stale WAL/SHM.
+  Destination-only non-chat files are kept. It never merges SQLite or
   compares file timestamps. Chat/local databases, safe settings, skills and
   pets, local ChatGPT project data, other durable state, worktrees, plugins and
   visualizations are selected by default. Local project files do not guarantee
@@ -59,7 +60,10 @@ Release/version: 0.2.0
   `hostedaccounts.xml`, `opentabs.xml`, `passwd`, `userhosts`, and the current
   `user.config`; direct restore needs `RESTORE`, takes a safety copy, verifies
   every replaced target against its bundled SHA-256, and exposes a post-restore
-  `DELETE` action. Its managed bundle list shows only
+  `DELETE` action. Version-3 source-profile metadata is provenance only;
+  primary files overwrite both Local/Roaming configuration roots, with separate
+  safety copies and hash checks. `user.config` maps independently to the current
+  installation. Version-1/2 bundles remain readable. Its managed bundle list shows only
   matching configuration ZIPs and allows confirmed deletion. Windows Vault, OAuth/DPAPI-bound
   secrets and SSH keys remain excluded, so target-machine sign-in may still be
   required.
@@ -151,7 +155,92 @@ failure because the current user home could not be resolved.
 
 Never mark validation as passing unless it was actually run.
 
+2026-10-06 Migration restore: check/lint/build and 32 frontend tests passed;
+native library run had 91 passing tests, one opt-in test ignored, and the same
+existing environment-manager home-resolution failure. The opt-in real Codex
+ZIP restore passed separately, verifying all 618 files in an isolated target.
+SourceTree overwrite/rollback tests and 847px/600px browser layout fixtures
+passed. A separate optimized portable test EXE was built; new-machine Desktop
+and packaged-app interaction remain NOT RUN. See `docs/VALIDATION.md`.
+
 ## Important Recent Decisions
+
+2026-10-06 SQLite copy progress: the target database is stationary at
+6,685,187/14,446,592 bytes; its UI remains at 563 while native logs reach 608.
+Replace the leading-edge notification throttle with an independent latest-state
+100ms UI observer. Channel transport cannot hold native file work. A shared
+64KiB copy reports read/write boundaries and confirmed written bytes while
+retaining integrity and rollback. The frontend memoizes the static inventory,
+ignores late callbacks and derives completion from the native result. Target
+I/O cause and new-machine completion remain unverified.
+Local check/lint, 34 frontend tests, 13 migration/four command tests, independent
+review and optimized separate copy-progress EXE passed. Actual supplied ZIP:
+618/618 independent output hashes matched on both fresh and populated isolated
+targets through the real asynchronous trace (371.94s total debug test).
+
+2026-10-06 Diagnostic logger isolation: the user confirms their raw log ends
+mid-JSON with the true callback flag on `verify-read`. The callback returned;
+the after-callback diagnostic write held this run before verification resumed.
+Logging now uses a bounded `try_send` queue and a worker owning only the log,
+with complete record encoding and no production join. Restore retains all
+path, source/safety, actual-byte SHA and rollback checks. Full/disconnected
+diagnostics are discarded/counted rather than holding data operations.
+Twelve focused migration tests passed, including a deliberately blocked writer
+with a full queue while a real isolated restore and independent SHA complete.
+Actual new-machine completion/Projects menu remains unverified.
+The supplied real ZIP now runs through the actual asynchronous trace too:
+618/618 files restored and independently SHA-checked on fresh/populated isolated
+targets. Independent review and optimized log-fix EXE build passed.
+
+2026-10-06 Target preparation diagnostics: the handle-fix user run completes
+entry 595, then stops preparing entry 596. Earlier log records precede progress
+callbacks, so no exact blocked filesystem call was established. New false/true
+callback-return pairs plus check/mkdir/recheck and ancestor metadata records
+resolve that ambiguity. UI notification volume is bounded to ten per second
+within a stage, with stage changes immediate; local trace keeps every event.
+Safety/path/hash/rollback behavior remains unchanged. Target root cause and
+completion remain unconfirmed.
+Ten migration/four command tests, frontend check/lint and 33 tests, independent
+review and separate optimized path-trace EXE build passed. Actual IPC behavior
+on the new machine remains unverified.
+
+2026-10-06 Output-handle verification: the flush-fix target run closed file 595
+then stopped at `verify-file`; the supplied screenshot agrees with the trace.
+Restore and rollback now verify size and SHA using the original read/write
+handle before closing, with Windows sharing denying competing writes/deletes.
+No destination reopen, skipped file or SHA bypass is used. Nine focused native
+tests (including size/digest rejection, sharing and complete hash-failure
+rollback), frontend check/lint and 33 tests passed. Actual new-machine
+completion/Projects menu remains unverified; local validation cannot prove it.
+The actual supplied ZIP passed fresh/populated isolated restore with all
+618 files independently SHA-checked. Separate optimized handle-fix EXE built.
+
+2026-10-06 Destination flush removal: earlier user trace ended at `flush-file`
+after copying file 595 (exact blocked call was not established; see above).
+That build made restore/rollback close
+and SHA-check outputs using normal Windows writeback; both ZIP syncs and
+pre-delete safety verification remain. Focused 7 native tests and the actual
+618-file fresh/populated isolated round trips passed after this change.
+Optimized flush-fix EXE built. Destination power-loss durability differs from
+forced per-file sync; keep source/safety ZIPs. Actual new-machine completion
+and Projects menu still need verification.
+
+2026-10-06 Per-file diagnostics: target-machine restore remains stuck at
+594/618, with full-size entry 595 and entry 615 absent. A separate diagnostic
+EXE adds current filename/I/O operation and a local metadata trace in
+`%APPDATA%/codex-companion/logs/`. Native 7 focused tests, frontend 33 tests,
+check/lint and optimized build passed. Remote root cause remains unconfirmed;
+the earlier successful isolated round trips do not prove this stall resolved.
+
+2026-10-06 Restore progress follow-up: frontend check/lint/build and 33 tests,
+6 focused Codex migration tests, and the real-ZIP opt-in check passed. The
+618-file archive restored and hash-verified on both fresh and fully populated
+isolated targets. Replacement now reports actual phase/file counts, prunes
+excluded safety trees, uses verified Stored safety ZIPs, and reuses the strict
+manifest only after checking the unchanged ZIP digest under a read lock.
+The separate optimized `dev-companion-migration-progress-20261006.exe` was
+built; the canonical EXE was not overwritten. Target-machine app behavior
+and packaged restore interaction remain unverified.
 
 - Product branding is Dev Companion; existing `codex-companion` storage and
   archive identifiers remain for compatibility.
