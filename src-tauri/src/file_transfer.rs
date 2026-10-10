@@ -959,12 +959,14 @@ fn verified_log_path(
     configuration: &config::AppConfiguration,
     value: &str,
 ) -> Result<PathBuf, String> {
-    let root = logs_dir(configuration)
+    let directory = logs_dir(configuration);
+    let root = directory
         .canonicalize()
         .map_err(|_| "File transfer logs are unavailable.")?;
-    let candidate = Path::new(value);
+    let candidate = migrated_log_path(&directory, Path::new(value));
+    crate::fs_safety::check(&candidate)?;
     let metadata =
-        fs::symlink_metadata(candidate).map_err(|_| "The transfer log is unavailable.")?;
+        fs::symlink_metadata(&candidate).map_err(|_| "The transfer log is unavailable.")?;
     if metadata.file_type().is_symlink() || !metadata.is_file() {
         return Err("The transfer log is unavailable.".into());
     }
@@ -975,6 +977,26 @@ fn verified_log_path(
         return Err("The transfer log is unavailable.".into());
     }
     Ok(path)
+}
+
+fn migrated_log_path(directory: &Path, candidate: &Path) -> PathBuf {
+    let legacy = directory
+        .parent()
+        .and_then(Path::parent)
+        .and_then(Path::parent)
+        .map(|root| root.join("config/logs/file-transfer"));
+    if let Some(relative) = legacy
+        .as_ref()
+        .and_then(|legacy| candidate.strip_prefix(legacy).ok())
+    {
+        if relative
+            .components()
+            .all(|part| matches!(part, std::path::Component::Normal(_)))
+        {
+            return directory.join(relative);
+        }
+    }
+    candidate.to_path_buf()
 }
 
 fn write_log(
@@ -1068,6 +1090,22 @@ fn project_exclusions() -> &'static [&'static str] {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn old_config_log_paths_resolve_under_configs_without_accepting_traversal() {
+        let directory = std::path::Path::new(r"D:\Portable\configs\logs\file-transfer");
+        assert_eq!(
+            super::migrated_log_path(
+                directory,
+                std::path::Path::new(r"D:\Portable\config\logs\file-transfer\old.log")
+            ),
+            directory.join("old.log")
+        );
+        let outside = std::path::Path::new(r"D:\Other\config\logs\file-transfer\old.log");
+        assert_eq!(super::migrated_log_path(directory, outside), outside);
+        let traversal =
+            std::path::Path::new(r"D:\Portable\config\logs\file-transfer\..\outside.log");
+        assert_eq!(super::migrated_log_path(directory, traversal), traversal);
+    }
     use super::*;
     fn config(mode: TransferMode) -> TransferConfig {
         TransferConfig {

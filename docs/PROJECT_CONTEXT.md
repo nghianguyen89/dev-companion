@@ -26,7 +26,7 @@ The Milestone 2 adapter reads only those metadata records. It never reads messag
 
 ## Safety, performance, and portable mode
 
-All filesystem paths are centralized in `src-tauri/src/platform.rs`. Future writes must validate a known root, reject traversal, be explicitly confirmed, avoid silent overwrites, and provide a safety backup where applicable. Discovery runs on explicit UI refresh only; it performs no polling or idle disk activity. A `portable-mode` marker next to the executable makes Companion's own configuration and backups use adjacent `config/` and `backups/` folders; it never moves Codex data.
+All filesystem paths are centralized in `src-tauri/src/platform.rs`. Future writes must validate a known root, reject traversal, be explicitly confirmed, avoid silent overwrites, and provide a safety backup where applicable. Discovery runs on explicit UI refresh only; it performs no polling or idle disk activity. A `portable-mode` marker next to the executable makes Companion's own configuration and backups use adjacent `configs/` and `backups/` folders; it never moves Codex data.
 
 ## Milestones and status
 

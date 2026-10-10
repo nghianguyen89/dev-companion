@@ -17,7 +17,7 @@ The icon is embedded through `src-tauri/tauri.conf.json` and `icons/icon.ico`.
 Keep the complete `release/portable` folder writable and together when moving it:
 
 - `portable-mode` enables portable storage discovery.
-- `config/`, `backups/`, and `quarantine/` are used when portable mode is
+- `configs/`, `backups/`, and `quarantine/` are used when portable mode is
   enabled in Settings. `backups/` holds both Codex migration ZIPs and personal
   application bundles, including encrypted SourceTree configuration bundles.
 

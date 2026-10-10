@@ -32,10 +32,10 @@ pub fn portable_root() -> Option<PathBuf> {
 pub fn config_dir(configuration: &AppConfiguration) -> PathBuf {
     if configuration.portable_mode {
         if let Some(root) = portable_root() {
-            return root.join("config");
+            return root.join("configs");
         }
     }
-    app_data_dir().join("config")
+    app_data_dir().join("configs")
 }
 
 pub fn backup_dir(configuration: &AppConfiguration) -> PathBuf {

@@ -46,7 +46,7 @@ The embedded session payload compatibility contract is similarly narrow: its fir
 
 ## Restore history v1
 
-Companion stores local restore audit data at `config/restore-history-v1.json` (or the portable `config/` directory). The file has `formatVersion: 1` and retains at most 100 newest-first entries. Each entry has `occurredAt`, archive **name** only, `sessionIds`, `restoredCount`, `skippedConflicts`, optional `safetyBackupPath`, `outcome` (`completed`, `partial`, `rolledBack`, `failed`), and optional stable `errorCode`.
+Companion stores local restore audit data at `configs/restore-history-v1.json` (or the portable `configs/` directory). The file has `formatVersion: 1` and retains at most 100 newest-first entries. Each entry has `occurredAt`, archive **name** only, `sessionIds`, `restoredCount`, `skippedConflicts`, optional `safetyBackupPath`, `outcome` (`completed`, `partial`, `rolledBack`, `failed`), and optional stable `errorCode`.
 
 History never includes session content, full archive source paths, inspection/restore tokens, credentials, or native error messages. A missing file means empty history. A malformed, symlinked, non-regular, or future-version file is unavailable rather than interpreted. The UI is read-only and does not provide deletion or editing.
 # Delete safety archive v1
