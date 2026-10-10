@@ -378,3 +378,213 @@ To repeat the optional real-archive check without touching the live profile:
 $env:DEV_COMPANION_VALIDATION_ZIP = '<path to a Codex migration ZIP>'
 cargo test --manifest-path src-tauri/Cargo.toml --lib codex_migration::tests::real_archive_overwrites_fresh_install_and_verifies_every_file -- --ignored --nocapture --test-threads=1
 ```
+
+## 2026-10-08 XAMPP domain manager
+
+- PASS: pnpm check, pnpm lint, pnpm test (19 files / 38 tests), cargo check,
+  focused native XAMPP tests (10 passed; two opt-in tests run separately),
+  rustfmt and git diff --check.
+- PASS: opt-in isolated real OpenSSL/Apache integration with CA creation,
+  domain/www certificates, add/delete, hosts conflict rollback, start,
+  revision-confirmed restart, and shutdown cleanup.
+- PASS: explicit elevated initialization of the copied C:/xampp installation.
+  Existing CA reused and machine-trusted; four existing domains imported.
+  Windows-trusted HTTPS requests returned HTTP 200 for localhost,
+  cus-projects.local, cus-wordpress.local and cus-gitlab.local.
+  Legacy custom files were backed up, then removed; vendor makecert.bat kept.
+  Safety directory: C:/xampp/backup/dev-companion-1791426653180055000.
+  recovery.json records original targets and their verified safety copies.
+- PASS: browser fixture exercising the production React domain component
+  and styles with mocked native state: create, edit/rename, listing and delete
+  confirmation. This does not validate native packaged-app interaction.
+- PASS: build-publish.ps1 production frontend, optimized Tauri executable and
+  Windows x64 NSIS bundle; canonical portable executable updated.
+- NOT RUN: LAN access from another computer, packaged-app interactive CRUD,
+  and installing the NSIS bundle on a target machine.
+
+Portable: release/portable/dev-companion.exe
+SHA-256: 87B575055FF3F37E050C7E5F1C5255BD200F0C19DF6521BEAD5A7985D73D9983
+Installer: src-tauri/target/release/bundle/nsis/Dev Companion_0.2.0_x64-setup.exe
+Portable domain configuration: release/portable/configs/xampp/settings.json.
+
+### 2026-10-08 continuation: portable read-only acceptance
+
+- PASS: canonical portable EXE SHA-256 still matches the value above. Windows
+  UI Automation opened the real elevated portable XAMPP page, showing the saved
+  C:/xampp installation, four domains, trusted CA and enabled management controls.
+  This is a packaged native overview check, not CRUD acceptance.
+- PASS: 16 read-only HTTP/HTTPS HEAD checks (four domains, each with www,
+  both schemes) reached 200 after following redirects; responses contained
+  the current generated revision 1791428482622830600. Current settings have
+  redirectHttps enabled for cus-projects.local; that value was preserved.
+  localhost redirects to its dashboard; www redirect targets the primary name.
+  curl used Windows Schannel with --ssl-revoke-best-effort, retaining CA-chain
+  and hostname verification; no --insecure or custom trust bypass was used.
+- FAIL (probe/tooling): sandbox Schannel returned SEC_E_NO_CREDENTIALS; outside
+  the sandbox strict revocation returned CRYPT_E_NO_REVOCATION_CHECK for the
+  local CA without revocation information. The best-effort checks above passed.
+  Non-admin Apache -t could not access the restricted certificate directory;
+  this does not establish invalid running Apache configuration.
+- FAIL (test harness): Windows PowerShell misread Vietnamese UI labels from
+  the UTF-8 script without a BOM. No domain mutation occurred. The script now
+  has a BOM; its corrected CRUD execution remains unverified because the next
+  UAC request was canceled.
+- NOT RUN: portable create/edit/delete, listing and LAN toggle/firewall checks,
+  automatic restart through that UI, GUI folder picker/public CA export, a
+  second LAN client, NSIS installation, and elevated Apache syntax rerun.
+  Initial setup/cleanup and a port-binding fixture were intentionally not repeated.
+- No application defect was established; no product-code fix, rebuild,
+  commit or push was performed. Read-only evidence and prepared disposable UI
+  harness are under ignored release/xampp-ui-validation/. Two owned elevated
+  validation windows (PIDs 32172 and 36412) were opened; the pre-existing
+  portable window and Apache were left running. Do not terminate by process name.
+
+### 2026-10-08 browser security-warning investigation
+
+- User reports security warnings for all existing URLs on the XAMPP machine;
+  exact browser error code remains unavailable. Do not mark this report resolved.
+- PASS: public TLS peer metadata for all eight domain/www names matches SANs
+  and signatures against the exported CA. Leaf certificates are valid for one
+  year from 2026-10-08, with serverAuth usage; the CA expires in March 2035.
+  Metadata inspection alone is not a browser trust check.
+- PASS: the exported CA fingerprint matches LocalMachine/Root and
+  CurrentUser/Root; no same-subject CA was found in either Disallowed store.
+- PASS: installed Edge 154.0.4258.62, isolated headless context with
+  ignoreHTTPSErrors=false, loaded all four primary HTTPS URLs with HTTP 200,
+  TLS 1.3 and Chromium visibleSecurityState=secure, with no security issue IDs.
+  No certificate bypass or custom CA was supplied to this browser check.
+- NOT RUN: reproducing the warning in the user's active browser/profile;
+  Chrome is not installed at Playwright's expected path. Firefox is running,
+  but no error code was exposed in the visible UI Automation tree, and no
+  explicit enterprise-roots override was found in the selected prefs.js.
+  Those observations do not establish Firefox as the cause.
+- No Apache/CA/trust/browser-profile mutation or product fix was performed.
+  Safe public-certificate metadata and isolated browser results are retained
+  under ignored release/xampp-ui-validation/. Await the actual warning code
+  before changing certificates or browser trust.
+
+- Screenshot clarification: _screenshot_/bug-broswer.png shows the malformed
+  URL https://https//cus-projects.local/ in both Firefox and Edge. Firefox
+  reports Server Not Found for host "https"; Edge reports
+  DNS_PROBE_FINISHED_NXDOMAIN. This captured failure occurs during name
+  resolution, before certificate validation. Correct URL:
+  https://cus-projects.local/. Correct URL passed the isolated Edge checks
+  above; user confirmation in the active browser remains pending. No CA or
+  Apache change is required for the malformed URL shown in this screenshot.
+
+### 2026-10-08 domain-list layout
+
+- PASS: pnpm check, pnpm lint, pnpm test (19 files / 40 tests), rustfmt,
+  git diff --check and focused cargo test --lib xampp (11 passed, two opt-in
+  integration tests ignored). Native tests reject unknown names, www aliases,
+  URLs and unsafe strings for the new open actions.
+- PASS: real React App/browser fixture with mocked native bridge and clipboard:
+  SSL independent of redirect, active/muted www, open/copy primary HTTPS URL,
+  HTTP fallback, folder dispatch, listing toggle, edit and exact-name delete
+  guards, accessible tooltip labels and non-admin read-only actions. No row
+  overflow at 1100/847/600px, including a long domain/path. Screenshots and
+  fixture evidence are in ignored release/xampp-ui-validation/.
+- PASS: production frontend and optimized Tauri executable (build --no-bundle).
+  New executable: release/portable/dev-companion-domain-layout.exe, beside the
+  existing portable-mode marker and existing configs. Canonical old EXE and
+  NSIS installer were not replaced; no commit/push or live XAMPP mutation.
+- FAIL (build/tooling, recovered): inherited Node lookup prevented the first
+  build hook; a local build-config override with the bundled Node absolute path
+  succeeded. Sandbox linker could not overwrite a prior build DLL; the
+  explicitly approved unsandboxed build passed. Initial lint also scanned
+  generated scripts/WebView resources under release; ESLint now excludes that
+  generated artifact directory, consistent with its existing dist/target ignores.
+- FAIL (automation harness): UI Automation returned zero descendants for its
+  owned new portable window, so it could not find navigation controls even
+  after waiting and accepting both EN/VI labels. Owned test windows were closed.
+  This does not establish a render defect, and does not count as native UI PASS.
+- NOT RUN: packaged click verification of clipboard/default-browser/Explorer
+  behavior, new-row CRUD/listing with live backend, LAN-client and NSIS install.
+  The prepared smoke did not reach domain actions; existing domain settings,
+  certificates, trust and Apache were left unchanged. Full Rust suite not rerun.
+
+### 2026-10-08 domain action/copy follow-up
+
+- User reports three management icons cannot be used and copying causes a
+  flash. Source diagnosis: row controls shared the Administrator-dependent
+  canManage gate; Edit changed the off-screen form without scrolling. Copy
+  reused the page-wide busy/result wrapper, inserting/removing pending content.
+- Changed: row interactions require initialized installation, not Administrator
+  merely to open an edit/delete panel. Edit scrolls/focuses the form. Non-admin
+  listing/delete reveal contextual elevation guidance; Save and confirmed Delete
+  remain permission/setup-gated and native Administrator checks are unchanged.
+  Copy uses a dedicated clipboard handler and temporary in-button green check,
+  without changing busy or inserting the full result card.
+- PASS: frontend type-check, lint, 41 tests (19 files). Browser regression uses
+  a delayed clipboard promise: busy remains false, row coordinates and panel
+  height remain unchanged, and other buttons stay enabled. Non-admin edit fields
+  and focus work; listing shows a notice without calling save; confirmed Delete
+  remains disabled. Mocked bridge tests are not packaged native acceptance.
+- Source diagnosis also found elevation using ShellExecuteW SW_HIDE. It now
+  requests SW_SHOWNORMAL so the user-requested elevated app is visible.
+- PASS: focused Rust XAMPP tests (11 passed, 2 opt-in ignored), production
+  frontend and optimized Tauri build. Sandbox linker retry required approved
+  unsandboxed execution; final build passed. New portable executable:
+  release/portable/dev-companion-domain-actions-fix.exe (17185280 bytes), SHA256
+  0dabebeb41246b6692acd9cf6226e14e3de8a14bdd97189c5e5b452c94d6e642.
+  Canonical portable EXE retained with its original hash; git diff --check passed.
+- NOT RUN: actual UAC interaction with these updated controls; no domain
+  mutation or CA/Apache changes in this fix. Full Rust suite not rerun.
+
+### 2026-10-08 SSL indicator follows saved domain option
+
+- Diagnosis: SSL and open/copy used installation-wide CA readiness, ignoring
+  the individual saved redirectHttps checkbox. This kept SSL green after save.
+- Changed: SSL active and HTTPS URL now require CA readiness AND redirectHttps;
+  tooltip identifies the redirect state. Existing backend continues to provide
+  TLS vhosts/certificates even with HTTP redirect disabled.
+- PASS: frontend type-check, lint, 42 tests (19 files); real React mocked-bridge
+  browser edit/uncheck/save makes SSL muted and open/copy HTTP, recheck/save
+  restores green; www and delayed-copy/layout regressions also passed.
+- FAIL (build tooling): sandbox linker LNK1104 writing the existing DLL;
+  approved retry outside sandbox recovered it.
+- PASS: production frontend and optimized Tauri build; current portable is
+  release/portable/dev-companion-domain-ssl-fix.exe. Previous executables retained.
+- NOT RUN: updated portable live domain writes, LAN client and NSIS install.
+  No live domain/CA/Apache settings changed; no Rust changes or full Rust rerun.
+
+### 2026-10-08 unified configs storage
+
+- PASS: legacy settings/history/logs migrate preserving bytes and existing XAMPP
+  state; collisions preserve both folders before moving; junctions rejected;
+  old log paths remap within the known root and traversal/outside paths do not.
+- PASS: full Rust library suite outside sandbox, 111 passed, 3 opt-in ignored;
+  production frontend and optimized Tauri build. No frontend source changed.
+- FAIL (recovered): first junction fixture used forward slashes with mklink;
+  corrected path construction passed. Sandbox full suite had 110 PASS/1 FAIL
+  due to unavailable user home; unsandboxed retry passed all 111 tests.
+- FAIL (permissions, recovered): sandbox denied moving the portable settings
+  file. Approved retry moved it; SHA256 matches the retained pre-move copy in
+  release/xampp-ui-validation/settings-before-configs-merge.json. Legacy config
+  directory removed only after empty; configs/xampp unchanged.
+- PASS: git diff --check. New portable: release/portable/dev-companion-configs.exe;
+  canonical old executables retained. Do not use old versions that write config.
+- NOT RUN: packaged interactive migration/elevation, LAN client, NSIS install.
+  No XAMPP reinitialization/cleanup, Apache/CA changes, commit or push.
+
+## 2026-10-08 XAMPP safety-backup retention
+
+- PASS: pnpm check, pnpm lint, all 42 frontend tests, cargo check,
+  focused XAMPP run (14 passed, 2 opt-in ignored), full Rust library suite
+  (113 passed, 3 opt-in ignored), and scoped independent review.
+- PASS: isolated retention fixtures prove newest-N pruning, earliest/initial,
+  failed/pending/legacy protection, preservation of unexpected files/empty
+  directories, rejection of tampered recovery paths, and Windows junction
+  rejection without touching the external target. Old settings default to
+  10; values outside 1–100 are rejected.
+- Native cleanup tests delete fixture-owned backups only. All eight real
+  C:/xampp/backup directories remain; no live domain/CA/hosts changes were made.
+- NOT RUN: packaged GUI save-policy/clean action or live automatic pruning
+  after Apache restart. Existing outcomes cannot be inferred retrospectively;
+  old unknown-state backups intentionally remain protected.
+
+- PASS: optimized Tauri no-bundle build; production frontend included.
+  New portable: release/portable/dev-companion-xampp-retention.exe.
+  SHA-256: 5F913AA1A4380C953264EACBFD4478B9AAE23CE6AD25C522739AD4D552D18AAA.
+  Existing portable executables preserved; NSIS was not rebuilt for retention.
+- PASS: git diff --check after final code/doc changes.

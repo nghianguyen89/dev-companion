@@ -283,9 +283,8 @@ pub fn xampp_root() -> Result<PathBuf> {
     }
     #[cfg(windows)]
     {
-        let path = std::env::var_os("XAMPP_HOME")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| PathBuf::from(r"C:\xampp"));
+        let path = crate::xampp_domains::installation()?;
+
         let root = canonical_dir(&path, "the XAMPP installation")?;
         canonical_dir(&root.join("htdocs"), "the XAMPP htdocs folder")?;
         Ok(root)

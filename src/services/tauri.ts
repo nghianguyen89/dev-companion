@@ -98,3 +98,16 @@ export const pickCompressionFolder = (title: string): Promise<string | null> => 
 export const previewCompression = (config: CompressionConfig): Promise<CompressionCommandPreview> => invoke("preview_compression", { config });
 export const startCompression = (config: CompressionConfig): Promise<{ state: string }> => invoke("start_compression", { config });
 export const cancelCompression = (): Promise<void> => invoke("cancel_compression");
+
+export const getXamppDomains = (): Promise<import("../types/codex").XamppDomainsOverview> => invoke("get_xampp_domains");
+export const setXamppBackupRetention = (keepRecent: number): Promise<import("../types/codex").XamppDomainsOverview> => invoke("set_xampp_backup_retention", { keepRecent });
+export const pruneXamppBackups = (): Promise<import("../types/codex").XamppDomainAction> => invoke("prune_xampp_backups");
+export const xamppDomainUrl = (name: string, httpsReady: boolean): string => `${httpsReady ? "https" : "http"}://${name}/`;
+export const openXamppDomain = (name: string, https: boolean): Promise<void> => invoke("open_xampp_domain", { name, https });
+export const openXamppDomainFolder = (name: string): Promise<void> => invoke("open_xampp_domain_folder", { name });
+export const setXamppInstallation = (path: string): Promise<import("../types/codex").XamppDomainsOverview> => invoke("set_xampp_installation", { path });
+export const initializeXamppDomains = (ca: import("../types/codex").XamppCaInput): Promise<import("../types/codex").XamppDomainAction> => invoke("initialize_xampp_domains", { ca });
+export const saveXamppDomain = (domain: import("../types/codex").XamppDomain, previousName: string | null): Promise<import("../types/codex").XamppDomainAction> => invoke("save_xampp_domain", { domain, previousName });
+export const deleteXamppDomain = (name: string, confirmation: string): Promise<import("../types/codex").XamppDomainAction> => invoke("delete_xampp_domain", { name, confirmation });
+export const exportXamppCa = (destination: string): Promise<import("../types/codex").XamppDomainAction> => invoke("export_xampp_ca", { destination });
+export const elevateXamppManager = (): Promise<import("../types/codex").XamppDomainAction> => invoke("elevate_xampp_manager");

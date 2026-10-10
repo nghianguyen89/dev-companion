@@ -169,3 +169,9 @@ export interface XamppReadiness { supported: boolean; installationFound: boolean
 export interface XamppPreview { token: string; sourceAppVersion: string; architecture: string; projects: string[]; configFiles: string[]; fileCount: number; bytes: number; excludedCount: number; sensitive: boolean; }
 export interface XamppInspection { token: string; bundleName: string; createdAt: string; sourceAppVersion: string; architecture: string; projects: string[]; fileCount: number; bytes: number; sensitive: boolean; }
 export interface XamppRecoveryPreview { token: string; stagingPath: string; destinationConflicts: number; manualOnly: boolean; }
+
+export interface XamppDomain { name: string; folder: string; www: boolean; redirectHttps: boolean; directoryListing: boolean; lan: boolean; }
+export interface XamppCaInput { commonName: string; organization: string; unit: string; country: string; state: string; city: string; email: string; days: number; }
+export interface XamppBackupOverview { count: number; totalBytes: number; prunableCount: number; keepRecent: number; }
+export interface XamppDomainsOverview { installationPath: string | null; configDirectory: string; administrator: boolean; initialized: boolean; caReady: boolean; caTrusted: boolean; domains: XamppDomain[]; lanAddresses: string[]; backups: XamppBackupOverview; message: string; }
+export interface XamppDomainAction { message: string; safetyPath: string | null; }

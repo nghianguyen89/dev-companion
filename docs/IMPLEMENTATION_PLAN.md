@@ -697,3 +697,67 @@ choice whether a native opaque `.bcpkg` includes saved passwords or FTP/SSH
 credentials; it does not inspect the package, move a license, encrypt the ZIP,
 upload it, or import it automatically. A future application remains a concrete
 adapter/card/command/test slice, not a provider framework.
+
+## 2026-10-08 XAMPP domain manager (approved scope)
+
+Add a concrete xampp_domains.rs adapter and Domain UI alongside the existing backup page.
+Portable state: configs/xampp/settings.json beside backups; generated Apache include and public CA export there. Private CA/server keys remain under the selected XAMPP installation with restricted ACLs, excluded from ordinary backup.
+Detect saved installation, XAMPP_HOME and C:/xampp; allow folder picker; disable unavailable operations.
+First setup: archive explicitly identified old custom files under xampp/backup before removing them; preserve vendor files and unrelated content. Existing valid CA may be adopted with key/certificate matching verification; localhost configured first. Keep a recovery copy before any write.
+Support domain create/edit/delete, folder outside htdocs, optional www and HTTP redirect, optional directory listing and LAN access. Managed configuration/hosts blocks only; reject conflicts and unsafe domain/path/config inputs. Require Administrator for apply and machine trust. Import public CA only.
+Apply stages certificates and configs, checks Apache syntax, writes protected hosts and managed include, automatically restarts the selected Apache instance or starts it if stopped. Roll back files and report restart/recovery failures honestly. LAN instructions export only public CA and identify DNS/hosts/firewall steps on other machines.
+Checks: domain/hosts/render/rollback native tests, frontend checks/lint/tests/build, isolated real OpenSSL/Apache smoke; real-machine setup only after verified archive. No commits or push.
+
+Implementation/build and live copied-install initialization are complete.
+Pending acceptance: packaged portable GUI/native CRUD, another LAN client and
+NSIS target-machine install. Continuation context and runtime/recovery paths
+are in `docs/XAMPP_HANDOFF.md`; do not repeat first setup/cleanup on resume.
+
+Continuation acceptance: the actual portable overview and read-only checks of
+all four domain/www names passed. The prepared Windows UI Automation CRUD
+harness needs a fresh accepted UAC request; a canceled prompt prevented its
+corrected execution. Keep CRUD/restart/options, LAN client and NSIS acceptance
+pending. Do not infer a product defect from Schannel sandbox/revocation or
+Windows PowerShell script-encoding failures; details are in VALIDATION.md.
+
+### 2026-10-08 domain-list layout (approved)
+
+Use the supplied layout-ui-domain-list.png as layout reference: muted/active
+SSL+www indicators, primary name with open/copy icons, clickable folder below,
+and listing/edit/delete icons with tooltips at right. User confirmed copying
+the complete URL without adding www. Follow-up: derive the SSL indicator and
+open/copy scheme from saved redirectHttps plus CA readiness. Unchecking redirect
+does not disable the backend TLS listener. Preserve confirmation and Administrator gates.
+Affected: focused row component, XamppDomains, scoped styles and EN/VI labels;
+two typed native open commands validated against saved domains. Validate URL
+scheme/alias behavior, folder dispatch, disabled states and responsive layout;
+keep mocked React checks separate from packaged native/clipboard verification.
+
+### 2026-10-08 unified configs directory
+
+Use configs for shared app settings, transfer history/logs and existing XAMPP
+state in portable and installed storage. On settings load/save, migrate legacy
+config entries without reading their contents, rejecting links and destination
+collisions before moving anything. Preserve legacy paths to migrated transfer
+logs through validated remapping. Test migration, collision preservation and
+path compatibility; build a new portable and migrate the local portable's lone
+settings file after verifying scope. Never mutate live Apache/CA or commit/push.
+
+## 2026-10-08 XAMPP safety-backup retention (approved)
+
+Add keepRecent (default 10, range 1–100), backup count/bytes and manual cleanup
+in the existing domain UI. Each new transaction writes owned versioned status
+metadata before changes, then marks completed only after successful apply or
+failed on rollback. Protect initial/oldest, failed, pending and legacy unknown
+status archives. Delete only surplus completed archives with strict direct
+folder/manifest/file validation and no links; unknown content stays untouched.
+Automatic cleanup runs after verified live success; cleanup failure is a
+warning, not rollback of a working configuration. Existing legacy archives
+are preserved because their outcomes cannot be established reliably.
+Validate retention/protection/tampering/link/default migration in isolated
+native tests plus frontend checks and focused UI tests. No live domain reset,
+CA replacement, unrelated cleanup, commit or push.
+
+Retention implementation and validation completed: 42 frontend/113 native
+checks passed; optimized separate portable built. No actual backup directories
+removed. Packaged interaction/live restart pruning remain pending acceptance.

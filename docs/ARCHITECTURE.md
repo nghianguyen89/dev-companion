@@ -39,6 +39,11 @@ React features -> services/tauri.ts -> Tauri commands -> codex/session_storage/p
   `CODEX_HOME` and is never read, copied, logged, or returned to React.
 - `session_storage.rs`: version-conscious, read-only legacy rollout-session adapter. It recursively locates `.jsonl` files below the resolved `sessions/` root, reads only each file's first JSON record, and supports only `type: session_meta` with `payload.session_id` or `payload.id`. Optional labels and update timestamps come from `session_index.jsonl`. It never reads message records or guesses a newer schema.
 - `config.rs`: small JSON settings file, with safe defaults.
+  Shared settings/history/logs use configs; settings load/save migrate legacy
+  config entries with a complete metadata preflight, reject links/collisions,
+  and remove only the emptied legacy directory. Windows MoveFileW preserves
+  bytes without overwriting or requiring an NTFS hard-link capable drive.
+  Old transfer-history log paths are remapped within the validated log root.
 - `commands.rs`: the allowlisted interface available to the frontend. Its async
   wrappers send filesystem, process and dialog work to Tauri's blocking pool.
   One gate preserves sequential native operations while keeping the window
@@ -57,7 +62,7 @@ cell during every table render.
 
 ## Portable mode
 
-Portable mode requires a `portable-mode` marker file adjacent to the executable. When its setting is enabled and the marker is present, Companion stores its own config and all managed archives alongside the executable in `config/` and `backups/`; personal application bundles share `backups/` whenever the marker is present so they travel with `dev-companion.exe`. The SourceTree configuration list may move only its own validated legacy ZIPs from `backup/` into `backups/`, never overwriting a name collision. It does not move or rewrite Codex data.
+Portable mode requires a `portable-mode` marker file adjacent to the executable. When its setting is enabled and the marker is present, Companion stores its own config and all managed archives alongside the executable in `configs/` and `backups/`; personal application bundles share `backups/` whenever the marker is present so they travel with `dev-companion.exe`. The SourceTree configuration list may move only its own validated legacy ZIPs from `backup/` into `backups/`, never overwriting a name collision. It does not move or rewrite Codex data.
 
 ## Safety boundary
 
@@ -218,3 +223,62 @@ credential/key file names are excluded. Recovery validates the token, archive
 hash/inventory, matching destination version/architecture, and destination
 state, then writes create-new files only to Companion-owned staging with
 rollback. XAMPP placement and MariaDB import remain manual.
+
+## XAMPP domain management — 2026-10-08
+
+`xampp_domains.rs` is a separate concrete adapter next to the existing strict
+XAMPP file-bundle workflow. Portable domain metadata/generated include/public
+CA live in `configs/xampp/` beside `backups/`; installed builds use the same
+subfolder under Companion AppData. The saved installation also supplies the
+existing backup adapter's root. Validate binaries, htdocs and Apache ServerRoot.
+
+Administrator-only apply manages domain CRUD, www aliases, HTTP redirects,
+directory indexing, local/LAN access, Windows hosts and machine CA trust.
+Private CA/leaf keys remain under `xampp/apache/conf/dev-companion/` with
+restricted ACLs. Public-only CA export supports LAN clients; their DNS/hosts
+and trust still need setup on each client. Program-scoped Private-profile
+firewall access is limited to the local subnet when LAN domains are enabled.
+
+Initialization adopts valid matching legacy CA material and simple HTTP/HTTPS
+vhosts (matching document roots, optional www alias). Unsupported aliases or
+conflicts abort rather than discard them. Archive identified legacy scripts,
+CNF/cert/key files and changed configuration before any replacement. Safety
+copies and `recovery.json` remain under `xampp/backup/dev-companion-*/`.
+Generated includes and hosts use managed markers; unrelated mappings remain.
+OpenSSL creates random serials/SANs and leaf lifetimes capped below CA expiry.
+
+Apply checks Apache syntax, installs public machine trust, applies firewall,
+and restarts only the executable matching this installation's PID through the
+Windows Apache restart event. A fresh HTTP revision header confirms reload.
+Stopped Apache is started. File/settings failures roll back; initial reload
+recovery without a previous managed revision is explicitly unverified. Safety
+archives remain. Existing bundle format, htdocs-only scope and stopped-process
+requirement are unchanged; ordinary bundles exclude all private keys.
+
+The domain list uses a focused XamppDomainEntry view with SSL/www indicators,
+primary-URL open/copy, a folder link and tooltip-labelled listing/edit/delete
+actions. CA readiness derives from initialized+caReady; each row's SSL indicator
+and open/copy scheme also require its saved redirectHttps option. Disabling
+redirect does not remove the backend TLS vhost/certificate. Copy uses the existing browser clipboard API with surfaced
+errors; typed native open commands resolve only a saved, validated primary
+domain. Folder opening rechecks filesystem safety/existence. Both use direct
+Explorer arguments and the existing serialized blocking bridge, with no shell
+command interpolation or new dependency. Opening does not modify XAMPP.
+
+### XAMPP safety backup retention — 2026-10-08
+
+Domain settings add backward-compatible backupKeepRecent (default 10, 1–100).
+The domain overview includes validated recovery archive count/bytes and number
+eligible for cleanup. Separate serialized commands save retention or manually
+prune; they require Administrator and do not restart Apache.
+
+New archives carry operation.json (version 1, owned kind/id, initial flag,
+pending/completed/failed state). Automatic cleanup runs only after successful
+live apply/restart and completed-status persistence. Initial/oldest, failed,
+pending and legacy unknown-state archives remain protected. The newest N
+eligible completed backups are retained in addition to these protected copies.
+Malformed manifests, extra content and links/junctions are never deleted;
+invalid archives are excluded from the UI's validated inventory. Cleanup
+revalidates direct folder/manifest/file metadata and deletes exact flat files,
+never original targets or recursively through directories. Cleanup failure
+reports a warning without rolling back successfully applied configuration.

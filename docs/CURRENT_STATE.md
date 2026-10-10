@@ -116,7 +116,7 @@ Release/version: 0.2.0
 
 ## In Progress
 
-- No active feature work.
+- XAMPP domain manager implementation/build completed; packaged UI, LAN-client and installer acceptance remain pending. Read `docs/XAMPP_HANDOFF.md` before continuing from another account.
 
 ## Known Issues
 
@@ -251,3 +251,83 @@ and packaged restore interaction remain unverified.
 
 - Run the new NSIS installer on a target machine before release; do not claim
   Desktop chat migration until its manual workflow is verified.
+
+2026-10-08 XAMPP domains: separate GUI/native CRUD with automatic Apache
+start/restart, local HTTPS CA bootstrap/reuse and machine trust, optional www,
+HTTP redirect, directory listing and LAN. Portable domain state is under
+configs/xampp; ordinary backup contract remains unchanged. Copied C:/xampp was
+initialized with its existing CA; localhost and three cus-*.local domains were
+imported, Windows-trusted HTTPS returned HTTP 200 for all four, and identified
+legacy custom files were archived before removal. Recovery directory:
+C:/xampp/backup/dev-companion-1791426653180055000. LAN client validation remains
+NOT RUN. See ARCHITECTURE, USER_GUIDE and VALIDATION for scope and checks.
+
+2026-10-08 continuation: real portable XAMPP overview inspected through Windows
+UI Automation; all 16 domain/www HTTP/HTTPS HEAD checks passed with current
+revision and Windows trust (curl revocation best-effort for the local CA).
+Current cus-projects.local redirectHttps=true was preserved. Portable CRUD,
+restart/listing/LAN option acceptance remains NOT RUN: the UTF-8/BOM harness
+issue was corrected, but the next Windows UAC request was canceled. No domain
+mutation, initialization, cleanup, product-code fix, rebuild, commit or push.
+See VALIDATION.md for probe FAIL versus application-test NOT RUN boundaries.
+
+2026-10-08 browser warning follow-up: user reports all local HTTPS URLs show
+security warnings. Public certificate SAN/signature/dates and both Windows
+root stores passed inspection; isolated installed Edge loaded all four HTTPS
+sites with TLS 1.3 and secure state (no certificate bypass). The user's active
+browser/profile warning remains unresolved pending its exact error code.
+No CA, Apache, browser profile or trust setting was changed.
+
+Screenshot follow-up: _screenshot_/bug-broswer.png identifies a malformed
+https://https//cus-projects.local/ URL causing DNS lookup of host "https"
+(Firefox Server Not Found; Edge DNS_PROBE_FINISHED_NXDOMAIN). The captured
+failure is explained by that URL; use https://cus-projects.local/. Correct
+HTTPS already passed isolated Edge validation; active-browser confirmation
+is pending. No certificate/configuration fix was needed for this screenshot.
+
+2026-10-08 domain-list layout implemented: SSL/www status icons, primary full-URL
+open/copy (user chose full URL, no www), clickable source folder, right-side
+listing/edit/delete icons with tooltips. Saved-domain-only native open commands
+preserve management gates and existing contracts. Frontend check/lint/40 tests,
+11 focused XAMPP Rust tests, responsive mocked-bridge browser checks and optimized
+EXE build passed. New portable: release/portable/dev-companion-domain-layout.exe;
+canonical old EXE/installer retained. Packaged click smoke remains NOT RUN after
+UI Automation exposed no descendants. No domain/CA/Apache changes or commit/push.
+
+2026-10-08 action follow-up: separated row interactions/draft editing from
+Administrator-only writes, added edit scroll/focus and contextual elevation
+guidance for non-admin listing/delete. Copy now uses local in-button feedback
+and never toggles page-wide busy. Type-check/lint/41 frontend tests and delayed
+clipboard/non-admin browser regressions passed; packaged UAC action acceptance
+still pending. Native permission checks and live XAMPP state are unchanged.
+Elevation now requests a visible window (SW_SHOWNORMAL). Focused Rust tests
+(11 passed, 2 opt-in ignored) and optimized build passed. Current review build:
+release/portable/dev-companion-domain-actions-fix.exe; previous executables
+remain intact. No commit/push.
+
+2026-10-08 SSL indicator follow-up: user expects the icon to follow the saved
+HTTPS redirect checkbox. Row icon and open/copy URL scheme now require both
+CA readiness and that domain's redirectHttps value. Tooltip explicitly refers
+to redirect. Backend TLS certificates/vhosts stay intact when redirect is off.
+42 frontend tests, type-check/lint and mocked React edit-save-toggle browser
+regression passed; live settings were not modified.
+Optimized portable build passed: release/portable/dev-companion-domain-ssl-fix.exe.
+Previous executables retained; packaged live-write acceptance remains NOT RUN.
+
+2026-10-08 config/configs unified: shared app settings and transfer history/logs
+now use configs in portable/installed mode; XAMPP remains configs/xampp.
+Legacy config entries migrate on settings load/save after rejecting links and
+collisions; old transfer log paths are validated/remapped. The local portable's
+single settings file was moved unchanged, with a retained safety copy outside
+portable, and empty config removed. Current executable:
+release/portable/dev-companion-configs.exe. Full Rust suite outside sandbox:
+111 PASS, 3 opt-in ignored; optimized build PASS. No live Apache/CA mutation.
+
+2026-10-08 XAMPP safety-backup retention completed: default 10 recent completed
+archives (1–100), protected initial/oldest, failed/pending and legacy outcomes,
+validated inventory plus manual cleanup UI, automatic pruning after verified
+live success. No real backup/domain/CA changes. Check/lint/42 frontend tests,
+113 Rust tests (3 opt-in ignored), independent review and optimized portable
+build passed. Current executable: release/portable/dev-companion-xampp-retention.exe.
+Previous EXEs preserved; close them before using this version. Packaged policy/
+cleanup and live automatic prune acceptance remain NOT RUN; see VALIDATION.md.

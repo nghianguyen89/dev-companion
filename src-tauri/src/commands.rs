@@ -928,3 +928,65 @@ mod tests {
         assert_eq!(tauri::async_runtime::block_on(run_blocking(|| 7)), Ok(7));
     }
 }
+
+#[tauri::command]
+pub async fn get_xampp_domains() -> Result<crate::xampp_domains::Overview, String> {
+    run_blocking(crate::xampp_domains::overview).await?
+}
+#[tauri::command]
+pub async fn open_xampp_domain(name: String, https: bool) -> Result<(), String> {
+    run_blocking(move || crate::xampp_domains::open_domain(name, https)).await?
+}
+#[tauri::command]
+pub async fn open_xampp_domain_folder(name: String) -> Result<(), String> {
+    run_blocking(move || crate::xampp_domains::open_domain_folder(name)).await?
+}
+#[tauri::command]
+pub async fn set_xampp_installation(
+    path: String,
+) -> Result<crate::xampp_domains::Overview, String> {
+    run_blocking(move || crate::xampp_domains::set_installation(path)).await?
+}
+#[tauri::command]
+pub async fn initialize_xampp_domains(
+    ca: crate::xampp_domains::CaInput,
+) -> Result<crate::xampp_domains::Action, String> {
+    run_blocking(move || crate::xampp_domains::initialize(ca)).await?
+}
+#[tauri::command]
+pub async fn save_xampp_domain(
+    domain: crate::xampp_domains::Domain,
+    previous_name: Option<String>,
+) -> Result<crate::xampp_domains::Action, String> {
+    run_blocking(move || crate::xampp_domains::save_domain(domain, previous_name)).await?
+}
+#[tauri::command]
+pub async fn delete_xampp_domain(
+    name: String,
+    confirmation: String,
+) -> Result<crate::xampp_domains::Action, String> {
+    run_blocking(move || crate::xampp_domains::delete_domain(name, confirmation)).await?
+}
+#[tauri::command]
+pub async fn export_xampp_ca(destination: String) -> Result<crate::xampp_domains::Action, String> {
+    run_blocking(move || crate::xampp_domains::export_ca(destination)).await?
+}
+#[tauri::command]
+pub async fn elevate_xampp_manager(
+    app: tauri::AppHandle,
+) -> Result<crate::xampp_domains::Action, String> {
+    let result = run_blocking(crate::xampp_domains::elevate).await??;
+    app.exit(0);
+    Ok(result)
+}
+
+#[tauri::command]
+pub async fn set_xampp_backup_retention(
+    keep_recent: u32,
+) -> Result<crate::xampp_domains::Overview, String> {
+    run_blocking(move || crate::xampp_domains::set_backup_retention(keep_recent)).await?
+}
+#[tauri::command]
+pub async fn prune_xampp_backups() -> Result<crate::xampp_domains::Action, String> {
+    run_blocking(crate::xampp_domains::prune_backups).await?
+}

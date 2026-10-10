@@ -18,6 +18,7 @@ mod session_storage;
 mod sourcetree;
 mod sourcetree_config;
 mod xampp;
+mod xampp_domains;
 
 use commands::{
     discover_conversations, execute_local_delete, get_backup_storage, get_codex_paths,
@@ -100,6 +101,17 @@ pub fn run() {
             commands::preview_sourcetree_config_recovery,
             commands::recover_sourcetree_config,
             commands::delete_sourcetree_config_bundle,
+            commands::get_xampp_domains,
+            commands::set_xampp_backup_retention,
+            commands::prune_xampp_backups,
+            commands::open_xampp_domain,
+            commands::open_xampp_domain_folder,
+            commands::set_xampp_installation,
+            commands::initialize_xampp_domains,
+            commands::save_xampp_domain,
+            commands::delete_xampp_domain,
+            commands::export_xampp_ca,
+            commands::elevate_xampp_manager,
             commands::get_xampp_readiness,
             commands::preview_xampp,
             commands::create_xampp_bundle,

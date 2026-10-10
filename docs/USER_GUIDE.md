@@ -150,9 +150,60 @@ File đổi nội dung/mtime, liên kết/junction, không rõ schema hoặc đa
 
 Chạy `release/portable/dev-companion.exe`; giữ toàn bộ thư mục cùng
 `portable-mode` cạnh exe. Khi bật Portable trong Settings, Companion dùng
-`config/`, `backups/` và `quarantine/` cạnh exe cho settings, backup và safety
+`configs/`, `backups/` và `quarantine/` cạnh exe cho settings, backup và safety
 data. ZIP di chuyển Codex và bundle ứng dụng cá nhân cùng nằm trong `backups/`,
 nên copy cả thư mục portable là mang theo toàn bộ archive. Danh sách cấu hình
 SourceTree tự chuyển ZIP cũ đúng định dạng từ `backup/` sang `backups/`; nếu
-trùng tên, file cũ được giữ nguyên và không bị ghi đè. Không cần chạy quyền
-Administrator.
+trùng tên, file cũ được giữ nguyên và không bị ghi đè. Các chức năng thông thường không cần quyền Administrator; cấu hình domain XAMPP cần quyền này.
+
+Settings chung nằm tại `configs/settings.json`, domain tại `configs/xampp/`.
+Bản mới tự chuyển thư mục `config/` cũ sang `configs/`, giữ nguyên tệp; nếu
+trùng tên, dừng và giữ cả hai thư mục để xử lý, không ghi đè.
+
+## XAMPP: domain local và HTTPS
+
+- Mở tool với quyền quản trị; phần Domain có nút mở lại bằng quyền này.
+- Kiểm tra/chọn thư mục XAMPP. Apache phải trỏ đúng bản cài; nếu vừa chuyển
+  XAMPP sang vị trí khác, chạy `setup_xampp.bat` của XAMPP trước.
+- Bấm thiết lập lần đầu: dùng lại CA hợp lệ hoặc nhập thông tin tạo CA mới.
+  Tool tin cậy CA cho máy này, cấu hình localhost và nhập domain cũ hỗ trợ.
+- Nhập domain, chọn DocumentRoot (ví dụ `public`), tùy chọn www, chuyển HTTPS,
+  danh sách file và LAN; lưu để Apache tự khởi động/restart. Sửa/xóa chỉ tác
+  động cấu hình domain, không xóa source. localhost luôn được giữ.
+- Bật/tắt danh sách file qua tùy chọn hoặc nút riêng. Mặc định domain mới tắt.
+- Danh sách domain: biểu tượng SSL xanh lá khi domain bật chuyển hướng HTTPS và CA sẵn
+  sàng; WWW xanh dương khi bật bí danh, trạng thái chưa bật có màu xám nhạt.
+  Bỏ chọn chuyển HTTP sang HTTPS rồi lưu sẽ làm SSL xám. Nút mở và copy dùng URL
+  đầy đủ của domain chính, không thêm www; dùng HTTPS khi bật chuyển hướng và CA
+  sẵn sàng, HTTP khi tắt. Tắt chuyển hướng vẫn giữ chứng chỉ và truy cập HTTPS.
+  Bấm đường dẫn/biểu tượng thư mục để mở source trong Explorer. Ba icon bên
+  phải là bật/tắt liệt kê, sửa và xóa; rê chuột để xem tooltip. Mở/copy/thư mục
+  không cần Administrator. Nút sửa cuộn đến form và cho chỉnh bản nháp; khi
+  chưa có quyền quản trị, index/xóa hiện hướng dẫn và nút mở lại bằng quyền này.
+  Lưu/xóa cấu hình thật vẫn cần Administrator. Copy báo thành công bằng dấu
+  check ngay tại icon, không chuyển toàn bộ phần Domain sang trạng thái chờ.
+- LAN: chọn mạng Windows Private; tool mở firewall Apache trong subnet nội bộ.
+  Trên máy khách, trỏ domain/www qua hosts hoặc DNS về IP LAN hiển thị của máy
+  chủ và cài CA công khai xuất từ tool vào Trusted Root. Không chia sẻ key CA.
+- Portable lưu cấu hình tại `configs/xampp/` cạnh `backups/`. Private key nằm
+  trong `xampp/apache/conf/dev-companion/`, không nằm trong backup thông thường.
+- Cấu hình/file tùy chỉnh cũ và các lần sửa được lưu trước vào
+  `xampp/backup/dev-companion-*/`; `recovery.json` chỉ rõ đường dẫn từng bản sao.
+  File không xác định hoặc CA vẫn được cấu hình khác sử dụng được giữ lại.
+- Backup XAMPP vẫn cần dừng Apache/MariaDB và process liên quan; phần Domain
+  chạy độc lập với yêu cầu dừng process của backup.
+
+### Quản lý backup cấu hình domain
+
+Trong phần Domain có mục Bản sao lưu an toàn: số bản khôi phục hợp lệ, dung
+lượng và số bản muốn giữ (mặc định 10, cho đổi từ 1 đến 100). Lưu chính sách
+không restart Apache; bấm Dọn bản sao lưu cũ để dọn ngay theo chính sách đã lưu.
+Tool cũng tự dọn sau khi áp dụng cấu hình/restart thành công.
+
+Luôn giữ bản đầu tiên, các bản thiết lập đầu tiên, bản lỗi/đang xử lý và bản
+được tạo bằng phiên bản cũ chưa ghi trạng thái. Số bản giữ lại chỉ giới hạn
+các bản áp dụng thành công đủ điều kiện dọn; vì vậy tổng số bản có thể lớn
+hơn con số đã chọn. Các backup cũ hiện có không bị gán trạng thái thành công
+để tự xóa. File lạ, manifest hỏng hay liên kết/junction được giữ nguyên;
+phần thống kê chỉ tính các bản có thông tin khôi phục hợp lệ, không phải tổng
+dung lượng toàn bộ C:/xampp/backup. Cần quyền Administrator để lưu/dọn.
