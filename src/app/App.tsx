@@ -3,6 +3,7 @@ import { CodexEnvironmentsPage } from "../features/codex-environments/CodexEnvir
 import { CodexMigrationPage } from "../features/codex-migration/CodexMigrationPage";
 import { FileTransferPageUx as FileTransferPage } from "../features/file-transfer/FileTransferPageUx";
 import { CompressionPage } from "../features/compression/CompressionPage";
+import { ProjectCleanupPage } from "../features/project-cleanup/ProjectCleanupPage";
 import { CleanupPage } from "../features/cleanup/CleanupPage";
 import { useCallback, useEffect, useState } from "react";
 import { BeyondComparePage } from "../features/backup/BeyondComparePage";
@@ -22,20 +23,22 @@ import type { AppConfiguration } from "../types/codex";
 import { I18nProvider, translate, type TranslationKey, type TranslationValues } from "../i18n";
 import { resolveTheme } from "./theme";
 
-type Page = "fileTransfer" | "compression" | "codexAccounts" | "codexMigration" | "environment" | "beyondCompare" | "sourceTree" | "xampp" | "cleanup" | "dashboard" | "conversations" | "skills" | "pets" | "diagnostics" | "settings" | "guide" | "about";
+type Page = "projectCleanup" | "fileTransfer" | "compression" | "codexAccounts" | "codexMigration" | "environment" | "beyondCompare" | "sourceTree" | "xampp" | "cleanup" | "dashboard" | "conversations" | "skills" | "pets" | "diagnostics" | "settings" | "guide" | "about";
 const navigation: Array<{ id: Page; label: TranslationKey; group: TranslationKey }> = [
   { id: "dashboard", label: "nav.dashboard", group: "nav.overview" },
   { id: "fileTransfer", label: "fileTransfer.title", group: "nav.tools" },
   { id: "compression", label: "compression.title", group: "nav.tools" },
+  { id: "projectCleanup", label: "projectCleanup.title", group: "nav.tools" },
   { id: "codexAccounts", label: "codexAccounts.title", group: "nav.codex" },
   { id: "codexMigration", label: "codexMigration.title", group: "nav.codex" },
-  { id: "environment", label: "environment.title", group: "nav.manage" }, { id: "cleanup", label: "cleanup.title", group: "nav.tools" },
+  { id: "environment", label: "environment.title", group: "nav.manage" },
   { id: "beyondCompare", label: "beyondCompare.title", group: "nav.manage" },
   { id: "sourceTree", label: "sourceTree.title", group: "nav.manage" },
   { id: "xampp", label: "xampp.title", group: "nav.manage" },
   { id: "conversations", label: "nav.conversations", group: "nav.manage" },
   { id: "skills", label: "nav.skills", group: "nav.codex" },
-  { id: "pets", label: "nav.pets", group: "nav.codex" }, { id: "diagnostics", label: "nav.diagnostics", group: "nav.tools" },
+  { id: "pets", label: "nav.pets", group: "nav.codex" },
+  { id: "cleanup", label: "cleanup.title", group: "nav.codex" }, { id: "diagnostics", label: "nav.diagnostics", group: "nav.tools" },
   { id: "settings", label: "nav.settings", group: "nav.preferences" },
   { id: "guide", label: "guide.title", group: "nav.preferences" },
   { id: "about", label: "about.title", group: "nav.preferences" }
@@ -43,6 +46,7 @@ const navigation: Array<{ id: Page; label: TranslationKey; group: TranslationKey
 const navIconPaths: Record<Page, string> = {
   fileTransfer: "M4 7h11m-4-4 4 4-4 4M20 17H9m4-4-4 4 4 4",
   compression: "M4 5h16v14H4zM4 9h16m-11 4h6m-4 3h2",
+  projectCleanup: "M3 6h6l2 2h10v12H3zM8 12h8m-6 0v5m4-5v5",
   cleanup: "M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14m-8 4v6m4-6v6",
   diagnostics: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-10v5m0-8h.01",
   codexAccounts: "M20 21a8 8 0 0 0-16 0m8-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8",
@@ -64,6 +68,7 @@ function NavIcon({ page }: { page: Page }) { return <svg className="nav-icon" vi
 export function App() {
   const browserPreview = !isTauriRuntime();
   const [page, setPage] = useState<Page>("dashboard");
+  const [compressionSource, setCompressionSource] = useState("");
   const [systemPrefersDark, setSystemPrefersDark] = useState(() => typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches);
   useEffect(() => {
     const query = window.matchMedia("(prefers-color-scheme: dark)");
@@ -84,7 +89,7 @@ export function App() {
   return <I18nProvider value={{ language, t }}><main className="app-shell" data-theme={theme}>
     <aside className="sidebar">
       <div className="brand"><span className="brand-mark">D</span><div><strong>Dev</strong><span>Companion</span></div></div>
-      <nav aria-label={t("nav.primary")}>{groups.map((group) => <section key={group}><p>{t(group)}</p>{navigation.filter((item) => item.group === group).map((item) => <button key={item.id} className={page === item.id ? "active" : ""} type="button" onClick={() => setPage(item.id)}><NavIcon page={item.id} />{t(item.label)}</button>)}</section>)}</nav>
+      <nav aria-label={t("nav.primary")}>{groups.map((group) => <section key={group}><p>{t(group)}</p>{navigation.filter((item) => item.group === group).map((item) => <button key={item.id} className={page === item.id ? "active" : ""} type="button" onClick={() => { setCompressionSource(""); setPage(item.id); }}><NavIcon page={item.id} />{t(item.label)}</button>)}</section>)}</nav>
       <footer><span className="status-dot" /> {t("nav.localFoundation")}</footer>
     </aside>
     <section className="content">
@@ -98,8 +103,9 @@ export function App() {
       {page === "sourceTree" && <SourceTreePage />}
       {page === "xampp" && <XamppPage />}
       {page === "cleanup" && <CleanupPage />}
+      {page === "projectCleanup" && <ProjectCleanupPage onArchive={source => { setCompressionSource(source); setPage("compression"); }} />}
       {page === "fileTransfer" && configuration.value && <FileTransferPage configuration={configuration.value} onSaveConfiguration={save} />}
-      {page === "compression" && <CompressionPage />}
+      {page === "compression" && configuration.value && <CompressionPage configuration={configuration.value} onSaveConfiguration={save} initialSource={compressionSource} />}
       {page === "skills" && <SkillsPage />}
       {page === "pets" && <PetsPage />}
       {page === "diagnostics" && <DiagnosticsPage diagnostics={diagnostics.value} loading={diagnostics.loading} error={diagnostics.error} onRefresh={diagnostics.refresh} />}

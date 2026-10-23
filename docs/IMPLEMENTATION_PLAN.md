@@ -1,5 +1,56 @@
 # Implementation Plan — Personal application migration
 
+## 2026-10-17: Opt-in sensitive Codex settings
+
+- Add an unchecked migration-backup checkbox to retain credential-bearing settings intact, including AGENTS.md falsely rejected because `secretary` contains `secret`.
+- Carry the choice through estimates, native preview token and both source inventory rechecks. Keep existing ZIP v1 inspection, hash checks, safety replacement and rollback; settings paths already pass archive policy.
+- Keep authentication/machine-identity files, runtime/cache, repository metadata and unsafe links excluded. Explain the scope and unencrypted ZIP beside the option. Do not access live authentication files or run a live restore.
+- Verify default exclusion, opted-in settings byte-for-byte roundtrip into an existing empty AGENTS.md, estimate accuracy, IPC forwarding and checkbox behavior. Preserve old archives and unrelated working-tree changes.
+
+## 2026-10-14: Codex environment CLI and launcher repair
+
+- Resolve Windows executable/batch CLI candidates instead of the extensionless npm shell shim. Reuse that resolution for version, login status and interactive handoff; include persisted PATH when the app inherited stale PATH.
+- Launcher generation validates CLI availability, targets the resolved CLI and ensures its directory is in User PATH. Preserve existing launcher ownership checks, child-only CODEX_HOME, arguments and exit code.
+- Add a read-only alias check that verifies fresh PATH resolution and runs only --version. Explain that unknown is an unverified login state; distinguish missing CLI from a failed version probe.
+- Touch only environment Rust, command registration/bridge/DTOs, page, translations, focused fixtures and docs. Preserve unrelated working-tree edits and credentials. Test batch resolution/execution, alias collisions/failures, launcher quoting, PATH deduplication and UI actions. Registry writes and interactive authentication require packaged manual validation.
+
+## 2026-10-14: Project Cleanup for archival
+
+- New independent Rust / React module under Tools; preserve Codex Cleanup and existing compression / transfer behavior and local edits.
+- Select one project or parent folder, scan read-only, explicitly select recognized regenerable items, request a fresh preview, then type DELETE GENERATED to permanently remove only the planned items. User chose permanent deletion; no recycle-bin mode or automatic deletion.
+- Narrow rules: dependency/cache directories require project markers; generic cache, dist/build/target/vendor, uploads, databases, source, .env, manifests, lockfiles, Git/SVN and backups are protected. Python bytecode caches must contain only recognized generated files.
+- Reject root/unsafe paths and reparse ancestors; bounded scans, no link traversal, cancel scans independently of the serialized native gate. Linked/unknown/inaccessible candidates are blocked. Incomplete scans cannot authorize deletion.
+- Backend owns scan IDs and preview tokens. Reject unknown/duplicate IDs, stale tokens, path escapes and changed markers/inventories. Revalidate all selected candidates before mutation; recheck each path before file removal. Remove scanned regular files and bottom-up empty directories only; never recursive-delete a root or follow a junction.
+- Preserve unrelated source and unselected candidates without requiring version control. Report actual removed files/directories/bytes and I/O errors; permanent deletion has no rollback promise. Stop watchers/builds before use; manual edits inside generated folders would be lost, and dependencies must be reinstallable.
+- Focused fixture checks: protected source/lockfiles, subset selection, changed/new files after preview, tokens/duplicate IDs, junction outside sentinel, bounds/cancel and partial errors. Check/lint/tests/frontend + optimized separate EXE. Live-project deletion, picker/Explorer/second-machine interaction remain NOT RUN unless actually exercised.
+
+## 2026-10-14: Codex cleanup navigation and storage inventory
+
+- Move cleanup to the end of the Codex navigation group, preserving existing compression edits.
+- Add metadata-only per-folder size inventory to the explicit scan (50,000 entries, 32 levels), sorted by size. Skip reparse points and inaccessible entries, label partial results as lower bounds.
+- Keep token/CLEAN, closed-process gate and schema/hash/mtime-verified catalog deletion unchanged. No recursive temp/plugin/database deletion: current .tmp contains marketplace/plugin checkouts whose age does not prove they are unused.
+- Validate scan limits/link exclusion, protected data preservation, frontend checks and a separate portable test executable. Do not run cleanup against the live Codex profile.
+
+## 2026-10-12: Large compression sources and reusable profiles
+
+- Source browsing lists direct children only; opening a folder loads another level.
+  Search/counts cover loaded entries, not the entire source.
+- Native preparation applies relative paths, folder names, extensions and Rust
+  regexes before recursive descent. Explicit includes override name/extension
+  defaults; explicit path exclusions and regexes retain priority.
+- Start registers the cancellation flag before background preparation, allowing
+  cancellation while collecting the selection. Preview still runs a fresh scan.
+- Built-in Project/Everything/Cache profiles and user profiles reuse settings.json
+  (serde defaults preserve old settings). Profiles store mode, rules and relative
+  selections; source/output are chosen separately.
+- Preserve reparse checks, real-empty-folder selection, direct 7-Zip launch and
+  no-overwrite publication. Pruning, lazy browsing, overrides, old-settings
+  compatibility and real archive inventory tests passed (13 compression tests).
+  Type-check, source lint, 37 frontend tests, four config tests and frontend build
+  passed; whole-repo lint is blocked by existing release validation artifacts.
+  Independent review passed. Packaged interaction/EXE and actual slow source
+  validation remain NOT RUN.
+
 ## 2026-10-06: SQLite copy boundary and stale sampled UI
 
 - Latest raw log reaches completed=608, copy-file for .codex/state_5.sqlite,
@@ -697,3 +748,28 @@ choice whether a native opaque `.bcpkg` includes saved passwords or FTP/SSH
 credentials; it does not inspect the package, move a license, encrypt the ZIP,
 upload it, or import it automatically. A future application remains a concrete
 adapter/card/command/test slice, not a provider framework.
+
+## 2026-10-14: Dependency output false positives
+
+The real Modernizr scan was blocked by node_modules/.cache and dependency out directories (fast-glob / @nodelib). Keep project discovery pruning unchanged; inside an already recognized generated candidate, output/cache names are ordinary generated content. Continue blocking VCS, environment, backup/upload/database content and links, with exact relative paths in reasons. Regression-test generated deletion versus preserved project output and protected nested content; validate the reported project with scan only.
+
+## 2026-10-14: Cleanup delete mode and archive handoff
+
+- Add preview-bound permanent/recycle modes; default new UI to recycle. Preserve old command calls as permanent when mode omitted, confirmations distinct. Both modes retain all-selection revalidation, token scope and protected/link guards.
+- Windows recycle uses native Shell API, requires verified recoverable content before mutation and fails on unsupported destinations; uncertain Shell deletion restores or retains that content. Counts distinguish recycled bytes from actual reclaimed bytes. Use fake recycler fixtures for boundaries plus opt-in owned-bin verification; never test against live projects.
+- After cleanup result, an Archive button hands the completed preview root to existing CompressionPage. It loads a fresh source scan, retains normal editable presets/output/preview/start workflow and never auto-starts 7-Zip. Consume handoff so later manual navigation does not reuse stale source. Partial cleanup reports remain visible before archive action.
+- Add focused mode/token/recycle failure and frontend handoff fixtures; preserve unrelated CLI-alias edits. Build a separate portable EXE and report true native/Explorer acceptance limits.
+Recycle review correction: Shell recycle flags alone cannot guarantee refusal on permanent fallback. Create and verify same-volume hardlinked recovery staging before Shell; revalidate candidate snapshot, require confirmed Bin result before removing stage. Restore absent source on error, retain staging on partial/colliding source, and protect retained recovery prefixes from subsequent scans. Refuse volumes without verifiable hardlinks.
+
+## 2026-10-14: pnpm node_modules link support
+
+- Reported real project `D:/projects/cus-gitlab/shinshin` uses an ordinary node_modules root with .pnpm/.modules.yaml and autoprefixer junction into its .pnpm tree. Current blanket reparse-content guard blocks a normal installation.
+- Change only Project Cleanup's nodeDependencies leaf handling: snapshot whitelisted junction/symbolic-link objects without visiting targets, bind link kind/target/reparse identity to preview, and remove the link object with safe parent checks. Candidate root/ancestor links, unknown reparse tags, protected content and linked caches remain blocked; shared fs_safety stays strict.
+- Recycle recovery staging must clone link objects without dereferencing or hardlinking their targets. Verify recreated reparse data, revalidate source snapshot before Shell, and retain existing restore/report rules. Do not mutate pnpm store/workspace targets, delete their target contents, or run install/cleanup in the live project.
+- Validate retargeted/new link preflight, external and dangling targets, Windows junctions, recovery copies/fallback, permanent unlinking, native Bin smoke with owned pnpm-like tree, and read-only real-project scan. Keep archive handoff unchanged; build a separately named EXE.
+
+## 2026-10-14: Recycle Shell parsing-name correction
+
+- Confirm E_INVALIDARG by changing the owned pnpm Bin fixture to the canonical path used by production scanning.
+- Normalize only Shell's UTF-16 parsing-name buffer from verbatim drive path to ordinary drive path. Leave canonical filesystem paths, safe-root/link restrictions and recovery staging unchanged.
+- Verify canonical/space/Unicode fixture plus full Rust regression suite; build a separate portable EXE. Do not invoke deletion against shinshin.

@@ -1,5 +1,5 @@
 import { Channel, invoke as invokeNative } from "@tauri-apps/api/core";
-import type { AppConfiguration, BackupStorageOverview, BeyondCompareBundleInspection, BeyondCompareBundlePreview, BeyondCompareReadiness, BeyondCompareRecoveryPreview, CodexContentActionResult, CodexEnvironmentActionResult, CodexEnvironmentInput, CodexEnvironmentInstructions, CodexEnvironmentOverview, CodexMigrationArchives, CodexMigrationCreated, CodexMigrationGroup, CodexMigrationOverview, CodexMigrationPreview, CodexMigrationRestorePreview, CodexMigrationRestoreProgress, CodexMigrationRestored, CodexPaths, CodexPetsOverview, CodexSkillsOverview, CompressionCommandPreview, CompressionConfig, CompressionReadiness, CompressionSourceTree, ConversationDiscovery, DeletePreview, DeleteResult, DiagnosticsSnapshot, FileTransferCommandPreview, FileTransferConfig, FileTransferDirectoryListing, FileTransferHistoryEntry, FileTransferReadiness, SourceTreeInspection, SourceTreePreview, SourceTreeReadiness, SourceTreeRecoveryPreview, XamppInspection, XamppPreview, XamppReadiness, XamppRecoveryPreview } from "../types/codex";
+import type { AppConfiguration, BackupStorageOverview, BeyondCompareBundleInspection, BeyondCompareBundlePreview, BeyondCompareReadiness, BeyondCompareRecoveryPreview, CodexContentActionResult, CodexEnvironment, CodexEnvironmentActionResult, CodexEnvironmentInput, CodexEnvironmentInstructions, CodexEnvironmentOverview, CodexMigrationArchives, CodexMigrationCreated, CodexMigrationGroup, CodexMigrationOverview, CodexMigrationPreview, CodexMigrationRestorePreview, CodexMigrationRestoreProgress, CodexMigrationRestored, CodexPaths, CodexPetsOverview, CodexSkillsOverview, CompressionCommandPreview, CompressionConfig, CompressionReadiness, CompressionSourceTree, ConversationDiscovery, DeletePreview, DeleteResult, DiagnosticsSnapshot, FileTransferCommandPreview, FileTransferConfig, FileTransferDirectoryListing, FileTransferHistoryEntry, FileTransferReadiness, SourceTreeInspection, SourceTreePreview, SourceTreeReadiness, SourceTreeRecoveryPreview, XamppInspection, XamppPreview, XamppReadiness, XamppRecoveryPreview } from "../types/codex";
 
 export const isTauriRuntime = () => typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 const browserPreviewConfiguration: AppConfiguration = { theme: "system", portableMode: false, createSafetyBackups: true, language: "en", logLevel: "warn", codexEnvironments: [], fileTransferProfiles: [] };
@@ -52,8 +52,9 @@ export const getConfiguration = (): Promise<AppConfiguration> => isTauriRuntime(
 export const saveConfiguration = (configuration: AppConfiguration): Promise<void> =>
   isTauriRuntime() ? invoke("save_configuration", { configuration }) : Promise.resolve();
 export const getCodexEnvironmentOverview = (): Promise<CodexEnvironmentOverview> => invoke("get_codex_environment_overview");
-export const saveCodexEnvironment = (input: CodexEnvironmentInput) => invoke("save_codex_environment", { input });
+export const saveCodexEnvironment = (input: CodexEnvironmentInput): Promise<CodexEnvironment> => invoke("save_codex_environment", { input });
 export const regenerateCodexLauncher = (id: string): Promise<CodexEnvironmentActionResult> => invoke("regenerate_codex_launcher", { id });
+export const checkCodexAlias = (id: string): Promise<CodexEnvironmentActionResult> => invoke("check_codex_alias", { id });
 export const removeCodexLauncher = (id: string, confirmation: string): Promise<CodexEnvironmentActionResult> => invoke("remove_codex_launcher", { id, confirmation });
 export const addCodexLauncherDirToUserPath = (): Promise<CodexEnvironmentActionResult> => invoke("add_codex_launcher_dir_to_user_path");
 export const getCodexEnvironmentInstructions = (id: string): Promise<CodexEnvironmentInstructions> => invoke("get_codex_environment_instructions", { id });
@@ -62,8 +63,8 @@ export const deleteCodexEnvironment = (id: string, confirmation: string): Promis
 export const openCodexEnvironmentHome = (id: string): Promise<CodexEnvironmentActionResult> => invoke("open_codex_environment_home", { id });
 export const openCodexEnvironmentAgents = (id: string): Promise<CodexEnvironmentActionResult> => invoke("open_codex_environment_agents", { id });
 export const runCodexEnvironmentAction = (id: string, action: "launch" | "login" | "logout"): Promise<CodexEnvironmentActionResult> => invoke("run_codex_environment_action", { id, action });
-export const getCodexMigrationOverview = (): Promise<CodexMigrationOverview> => invoke("get_codex_migration_overview");
-export const previewCodexMigration = (accountIds: string[], groups: CodexMigrationGroup[]): Promise<CodexMigrationPreview> => invoke("preview_codex_migration", { accountIds, groups });
+export const getCodexMigrationOverview = (includeSensitive = false): Promise<CodexMigrationOverview> => invoke("get_codex_migration_overview", { includeSensitive });
+export const previewCodexMigration = (accountIds: string[], groups: CodexMigrationGroup[], includeSensitive = false): Promise<CodexMigrationPreview> => invoke("preview_codex_migration", { accountIds, groups, includeSensitive });
 export const createCodexMigration = (token: string): Promise<CodexMigrationCreated> => invoke("create_codex_migration", { token });
 export const listCodexMigrationArchives = (): Promise<CodexMigrationArchives> => invoke("list_codex_migration_archives");
 export const openCodexMigrationArchive = (name: string): Promise<void> => invoke("open_codex_migration_archive", { name });
@@ -93,8 +94,14 @@ export const openFileTransferLog = (path: string): Promise<void> => invoke("open
 export const deleteFileTransferLog = (id: string): Promise<void> => invoke("delete_file_transfer_log", { id });
 export const openFileTransferLogsFolder = (): Promise<void> => invoke("open_file_transfer_logs_folder");
 export const getCompressionReadiness = (): Promise<CompressionReadiness> => invoke("get_compression_readiness");
-export const scanCompressionSource = (source: string): Promise<CompressionSourceTree> => invoke("scan_compression_source", { source });
+export const scanCompressionSource = (source: string, folder?: string): Promise<CompressionSourceTree> => invoke("scan_compression_source", { source, folder });
 export const pickCompressionFolder = (title: string): Promise<string | null> => invoke("pick_compression_folder", { title });
 export const previewCompression = (config: CompressionConfig): Promise<CompressionCommandPreview> => invoke("preview_compression", { config });
 export const startCompression = (config: CompressionConfig): Promise<{ state: string }> => invoke("start_compression", { config });
 export const cancelCompression = (): Promise<void> => invoke("cancel_compression");
+
+export const pickProjectCleanupFolder = (title: string): Promise<string | null> => invoke("pick_project_cleanup_folder", { title });
+export const scanProjectCleanup = (root: string): Promise<import("../types/codex").ProjectCleanupScan> => invoke("scan_project_cleanup", { root });
+export const cancelProjectCleanup = (): Promise<void> => invoke("cancel_project_cleanup");
+export const previewProjectCleanup = (token: string, ids: string[], mode: import("../types/codex").ProjectCleanupMode = "permanent"): Promise<import("../types/codex").ProjectCleanupPreview> => invoke("preview_project_cleanup", { token, ids, mode });
+export const executeProjectCleanup = (token: string, confirmation: string): Promise<import("../types/codex").ProjectCleanupOutcome> => invoke("execute_project_cleanup", { token, confirmation });

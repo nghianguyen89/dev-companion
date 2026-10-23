@@ -9,6 +9,20 @@ là dữ liệu nhạy cảm; Beyond Compare, bookmark SourceTree và XAMPP ch�
 vào staging để bạn tự đặt hoặc import. Cấu hình SourceTree là ngoại lệ có kiểm
 tra: chỉ được ghi sau khi xác nhận và tạo bản sao an toàn.
 
+## Môi trường Codex
+
+Lưu môi trường sẽ tạo launcher trong `%USERPROFILE%\bin` và tự thêm thư mục
+này vào User PATH. Với môi trường đã tạo bằng bản cũ, bấm **Tạo lại launcher**,
+sau đó **Kiểm tra alias**. Phép kiểm tra dùng PATH mới và chỉ chạy `--version`;
+nó báo lỗi nếu thiếu launcher, trùng lệnh hoặc launcher cũ/bị sửa. Đóng rồi mở
+lại các terminal đã chạy trước khi đổi PATH. Nếu chuyển phiên bản Node bằng
+nvm hoặc đổi nơi cài CLI, tạo lại launcher để cập nhật đường dẫn.
+
+**Đăng nhập: Chưa kiểm tra được** nghĩa là lệnh `codex login status` chưa cho
+kết quả xác định; không phải môi trường bị hỏng. Kiểm tra trạng thái CLI phía
+trên rồi bấm **Làm mới trạng thái**. Khi tìm thấy CLI nhưng kiểm tra phiên bản
+thất bại, app hiển thị lỗi riêng để anh kiểm tra Node.js/CLI.
+
 ## Hướng dẫn và Thông tin trong ứng dụng
 
 Dưới **Cài đặt**, mở **Hướng dẫn** để xem thao tác ngắn cho từng công cụ đang
@@ -62,15 +76,21 @@ profiles được lưu cùng settings cục bộ.
 1. Đóng Codex Desktop và mọi Codex CLI, mở **Codex > Di chuyển tài khoản Codex**. Nếu còn tiến trình nền, bấm **Đóng tiến trình Codex**, xác nhận, rồi kiểm tra lại; thao tác này hủy công việc Codex đang chạy.
 2. Ứng dụng tự phát hiện các thư mục trực tiếp `.codex` và `.codex-*` (ví dụ
    `.codex-cus`) rồi tick sẵn mọi nhóm dữ liệu bền vững: Chat/database,
-   settings an toàn + `AGENTS.md`, skills, pets, dữ liệu Project ChatGPT cục bộ,
+   settings + `AGENTS.md`, skills, pets, dữ liệu Project ChatGPT cục bộ,
    trạng thái Codex bổ sung, worktrees, plugins và visualizations. Project là
    `.chatgpt-projects` bên trong account, gồm metadata, hướng dẫn và source cục
    bộ; không đảm bảo dựng lại trạng thái Project cloud. Mỗi lựa chọn và tổng
    đang tick đều hiển thị dung lượng ước tính từ metadata nguồn hiện tại.
 3. Nhấn **Tạo backup**. Ứng dụng báo lúc đang rà soát/tạo ZIP và báo hoàn tất
    ngay dưới nút. ZIP được kiểm SHA-256 sau khi ghi; `auth.json`, định danh
-   máy, cache, temporary/runtime, sandbox, metadata Git và settings có dấu
-   hiệu credential không bao giờ được gồm.
+   máy, cache, temporary/runtime, sandbox và metadata Git không được gồm.
+   Tùy chọn **Di chuyển cả nội dung nhạy cảm** mặc định tắt. Bật để giữ nguyên
+   toàn bộ nội dung cấu hình đã chọn (`AGENTS.md`, `config.toml`, rules,
+   prompts), kể cả file có dấu hiệu credential. Khi tắt, những file này vẫn bị
+   bộ lọc nhạy cảm loại nguyên file; ví dụ `secretary` cũng khớp `secret`.
+   Số file và dung lượng ước tính cập nhật theo tùy chọn. ZIP không được mã hóa;
+   chỉ lưu/chuyển ở nơi tin cậy. Tùy chọn không gồm file đăng nhập Codex
+   (`auth.json`); máy mới vẫn cần đăng nhập lại.
 4. Mục **Các bản backup đã tạo** cho biết số ZIP, thời gian và dung lượng. Có
    thể mở Explorer tại ZIP hoặc bấm **Xóa** và xác nhận để xóa đúng ZIP đó.
 5. Trên máy mới, copy ZIP vào thư mục `backups/`, rồi bấm **Khôi phục** ngay
@@ -140,7 +160,9 @@ Trang Conversations chỉ xóa **file session local được chọn**, không x�
 
 ## Dọn dữ liệu tạm
 
-Đóng Codex → **Dọn dữ liệu tạm** → **Quét** → chọn nhóm → **Xem trước** → nhập `CLEAN`.
+Đóng Codex → nhóm **Codex** → **Dọn dữ liệu tạm** → **Quét** → chọn nhóm → **Xem trước** → nhập `CLEAN`.
+
+Sau **Quét**, bảng **Dung lượng Codex nằm ở đâu** cho biết dung lượng từng thư mục và nhóm file gốc. Bảng chỉ đọc metadata, không mở nội dung hay cho phép xóa các nhóm này. Giới hạn 50.000 mục / 32 cấp; liên kết, mục không truy cập được và giới hạn quét được báo là kết quả chưa đầy đủ. Thư mục `.tmp` có thể chứa checkout marketplace/plugin còn được tham chiếu, nên không tự coi là rác.
 
 Chỉ dọn `CODEX_HOME/cache/remote_plugin_catalog/<16 hex>.json`, schema 1 với `fetched_at` và `plugins`. Đây là danh mục có thể tải lại; có thể cần mạng sau khi dọn. Không dọn `plugins/cache`, database/log SQLite, thư mục `tmp` nói chung, backup/quarantine, project/worktree, skills/pets hay dữ liệu không rõ độ an toàn.
 
@@ -156,3 +178,46 @@ nên copy cả thư mục portable là mang theo toàn bộ archive. Danh sách 
 SourceTree tự chuyển ZIP cũ đúng định dạng từ `backup/` sang `backups/`; nếu
 trùng tên, file cũ được giữ nguyên và không bị ghi đè. Không cần chạy quyền
 Administrator.
+
+
+### Compression profiles and large sources (2026-10-12)
+
+Source browsing reads only direct children. Use **Open folder** to load the next
+level; the tree count and path search refer only to loaded items. Checking a
+folder includes its children even if they have not been opened.
+
+**Project** (default) skips common dependency/build/cache/log directories at any
+depth, plus .log/.tmp files, and keeps .git/.env. **Everything** removes these
+automatic exclusions. **Skip caches/logs** keeps dependencies and builds.
+Review the editable folder-name and extension lists before creating an archive;
+folders named build/dist/target can contain important output in some projects.
+Tree checkboxes override name/extension defaults. Explicit unchecked paths and
+Rust regex rules take priority; edit a regex to re-include a match.
+
+Enter a profile name and use **Save profile** to persist mode, rules, and relative
+selections in the existing portable/installed settings file. Load/Delete manage
+these profiles. Source and output folders are chosen separately; choosing a new
+source keeps the loaded relative rules and selections. Missing relative paths
+are ignored so one profile can be reused across projects.
+
+Preview and creation collect a fresh inventory and skip excluded directories
+before descent. Creation can be cancelled during preparation as well as 7-Zip
+execution. Preparation remains indeterminate; percentages come from 7-Zip.
+
+## Dọn dự án để lưu trữ — 2026-10-14
+
+Trong nhóm **Công cụ**, mở **Dọn dự án**. Chọn một dự án hoặc thư mục chứa nhiều dự án → **Quét** → chọn các mục đủ điều kiện → **Xem trước** → kiểm tra đường dẫn/dung lượng → chọn **Đưa vào Thùng rác** (mặc định) hoặc **Xóa vĩnh viễn** → nhập `RECYCLE GENERATED` hoặc `DELETE GENERATED` theo cách đã chọn → bấm dọn. Dự án không cần Git/SVN. Không mục nào được chọn sẵn; hủy quét không xóa file. Đổi thư mục, lựa chọn hoặc cách dọn sẽ hủy xem trước và chuỗi xác nhận cũ.
+
+Chỉ nhận diện dependency/cache theo quy tắc cụ thể, có marker dự án khi cần. Không dùng danh sách loại trừ của Nén tệp làm danh sách xóa. Không tự xóa các thư mục `cache`, `dist`, `build`, `target`, `vendor`, uploads/database/backup chung. Giữ mã nguồn, .env, manifest, lockfiles và Git/SVN; cây chứa dữ liệu được bảo vệ vẫn bị chặn. Liên kết pnpm nội bộ trong node_modules được dọn như một liên kết, không quét đích. Liên kết ra ngoài node_modules, liên kết ở thư mục gốc/cha và cache có liên kết bị chặn. Kết quả chưa đầy đủ không được dùng để xóa; hãy chọn dự án nhỏ hơn hoặc xử lý quyền đọc rồi quét lại.
+
+**Xóa vĩnh viễn, không có hoàn tác/bản sao an toàn.** Dừng build/watch trước, kiểm tra các chỉnh sửa thủ công trong dependency/cache và khả năng tải/cài lại dependency. Quét/xem trước không chứng minh mọi dependency vẫn còn trên registry. Native kiểm tra lại toàn bộ mục chọn trước khi xóa; file/marker thay đổi sẽ chặn thao tác. Nếu lỗi I/O xuất hiện trong lúc xóa, báo số file/thư mục/byte thực sự đã xóa; hãy quét lại thay vì suy đoán mọi mục đã hoàn tất.
+
+Sau khi kiểm tra kết quả, bấm **Nén để lưu trữ** để mở module **Nén tệp / 7-Zip** với đúng thư mục vừa dọn. Bộ lọc khởi đầu là **Toàn bộ**, giữ các file còn lại; có thể sửa trước khi **Xem trước** và **Tạo kho lưu trữ**. Nút này không tự chạy nén. Package manifest và lockfiles phải được giữ để cài lại dependency; `npm ci` cần package-lock.json hoặc npm-shrinkwrap.json phù hợp ([npm Docs](https://docs.npmjs.com/cli/v11/commands/npm-ci/)).
+
+Các nhóm hiện được nhận diện: node_modules; .parcel-cache, .vite, .turbo, .eslintcache, .stylelintcache và riêng .next/cache khi có package.json hợp lệ; __pycache__ chỉ khi toàn bộ file là bytecode và còn source .py/.pyw tương ứng. Giữ nguyên .next/standalone cùng .nuxt/.output/.svelte-kit và các build output chung. Giới hạn quét: 100.000 mục, 20.000 thư mục, 64 cấp, 2.048 candidate; chọn dự án nhỏ hơn nếu vượt giới hạn.
+
+Trong node_modules/candidate sinh ra đã nhận diện, tên out, coverage hoặc .cache là nội dung dependency/cache và không tự gây chặn. Quy tắc giữ output dự án vẫn áp dụng bên ngoài nhóm đó. Nếu bị chặn vì .env, database, backup, Git/SVN hoặc liên kết, lý do sẽ ghi đường dẫn tương đối cụ thể để anh kiểm tra.
+
+**Thùng rác:** dung lượng vẫn bị chiếm cho đến khi anh dọn Thùng rác. Native tạo lớp khôi phục tạm trên cùng ổ trước khi gọi Windows; nếu không tạo được (ví dụ ổ không hỗ trợ hard link), báo lỗi và giữ nguyên mục. Nếu Windows không xác nhận tái chế, khôi phục lại hoặc báo đường dẫn dữ liệu khôi phục còn giữ. Dừng build/watch trong suốt thao tác.
+
+Hỗ trợ bộ cài pnpm có liên kết nội bộ tới .pnpm trong node_modules; giữ package.json và lockfile. Không dọn pnpm store dùng chung. Dung lượng hiển thị là kích thước nội dung file, không bảo đảm giải phóng bấy nhiêu trên ổ đĩa vì pnpm có thể dùng hard link. Workspace/link tới thư mục ngoài node_modules vẫn bị chặn.

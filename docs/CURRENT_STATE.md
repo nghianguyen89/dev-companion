@@ -1,5 +1,21 @@
 # Current State
 
+## 2026-10-17: Sensitive migration settings opt-in
+
+- Codex account migration has an unchecked "Move sensitive content too" checkbox. It bypasses settings-content keyword exclusion, preserving selected AGENTS.md/config/rules/prompts intact. Estimates and both source rechecks use the preview's choice.
+- Authentication/machine identity, runtime/cache, Git metadata and unsafe links stay excluded. The UI explains this scope and that ZIPs are unencrypted. Existing v1 archives, verification, safety replacement and rollback remain compatible; legacy environment v2 is unchanged.
+
+## 2026-10-14: Codex environment CLI / alias repair
+
+- Fixed Windows CLI detection when npm's extensionless `codex` shim appears before `codex.cmd`; version/login/launch share executable-aware resolution and refreshed saved PATH.
+- Environment save/regeneration creates an explicit CLI launcher and ensures its directory is in User PATH. Existing terminals still need restarting. Alias checks report missing PATH, command collisions, changed/outdated launchers and failed --version probes.
+- Login status is now explicitly labelled; unknown says it could not be checked. Found-but-broken CLI installations show a probe error instead of claiming the CLI is absent.
+- Type-check, scoped lint, 43 frontend tests/build, 122 Rust library tests (3 opt-in ignored) and an explicit installed CLI version smoke passed. Registry writes, real authentication and packaged UI interaction remain NOT RUN.
+
+## 2026-10-14: Cleanup
+
+Cleanup moved into Codex navigation. Scan now explains disk usage through a bounded, metadata-only inventory. Only verified remote plugin catalog JSON remains eligible for deletion; temporary marketplace checkouts, installed plugins, sandbox binaries and chat/database data stay protected.
+
 Concise repository snapshot. Update at meaningful milestones.
 
 ## Baseline
@@ -20,7 +36,7 @@ Release/version: 0.2.0
 - Conversations table reuses its per-language date formatter, keeping filters
   and Refresh responsive for large local session inventories.
 - Codex Environment Manager: custom Windows `CODEX_HOME` entries, CLI status,
-  login/logout/launch handoff, safe `.cmd` launchers, User PATH opt-in, and
+  login/logout/launch handoff, safe `.cmd` launchers, automatic launcher User PATH setup, and
   marker-preserving global `AGENTS.md` management. It never persists or reads
   authentication credentials; removing metadata never deletes `CODEX_HOME`.
 - Codex Migration: scans the current user's direct `.codex` and `.codex-*`
@@ -45,8 +61,9 @@ Release/version: 0.2.0
   streamed output, cancellation, logs/history, profiles and optional
   non-destructive destination verification. Start analyzes first; determinate
   progress requires both the dry-run byte total and guarded English completed-file output.
-- File Compression: independent 7-Zip CLI `.7z` creation with a recursive,
-  read-only source tree, path and regex exclusions, Fast (`-mx=1`) / Strong
+- File Compression: independent 7-Zip CLI `.7z` creation with lazy,
+  read-only source browsing, early-pruned path/name/extension/regex exclusions,
+  built-in and saved profiles, Fast (`-mx=1`) / Strong
   (`-mx=9`) modes, source-parent output by default, direct output streaming,
   truthful 7-Zip percentage progress, bounded/filterable tree rendering,
   cancellation, reparse-point exclusion, and no-overwrite publication.
@@ -251,3 +268,29 @@ and packaged restore interaction remain unverified.
 
 - Run the new NSIS installer on a target machine before release; do not claim
   Desktop chat migration until its manual workflow is verified.
+
+
+2026-10-12 Compression profiles / large sources: source browsing now lists
+direct children and loads subfolders on demand. Preview/creation prune exclusions
+before descent; explicit includes override name/extension defaults, while path
+exclusions and regexes take priority. Start prepares in the cancellable worker.
+Project/Everything/Cache presets and saved mode/rule/relative-selection profiles
+use the existing settings file with backward-compatible serde defaults.
+Type-check, source-only lint, 37 frontend tests, frontend production build,
+13 compression tests (including real 7-Zip inventory smoke), four configuration
+tests and 11 SourceTree configuration tests passed. Independent source review
+found no remaining blockers. Full pnpm lint fails on 103 existing generated
+script/WebView errors under release/xampp-ui-validation. Diff check passed.
+Packaged-app interaction, new EXE/installer and the user's slow source are NOT RUN.
+
+## 2026-10-14: Project Cleanup
+
+- New independent Tools module for explicit scan / selection / preview / recycle or permanent deletion of recognized regenerable dependencies and caches, without Git/SVN.
+- Source, manifests/lockfiles and generic build/dist/vendor/target data remain outside the deletion rules. No automatic selection or background deletion. Native plans reject changed files, unsafe roots, links and incomplete scans; scan cancellation bypasses the operation gate.
+- Frontend source/type/fixture checks and native safety tests are recorded in VALIDATION.md. No live project was cleaned during implementation.
+
+- Cleanup now offers Recycle Bin (default) or permanent deletion, with mode-bound previews and separate counters. Archive result button preloads existing 7-Zip Compression with Everything filters; preview/start remain explicit. Recycle staging uses verified same-volume hardlinks and retains/reports recovery content on uncertain outcomes. No real user project was deleted during validation.
+
+- pnpm cleanup delta: normal node_modules junctions/symlinks targeting its own internal package tree are supported as leaf objects. External/workspace targets, linked roots/ancestors, chained/unsupported reparses and linked caches stay blocked. Recycle stages clone raw Windows reparse data, preserving junction type; the shared pnpm store is not cleaned. File sizes are logical content sizes, not guaranteed physical bytes freed.
+
+- Recycle canonical-path regression fixed: normalize only Windows Shell parsing buffer by dropping the filesystem verbatim drive prefix. The revised native pnpm smoke now tests canonical paths with spaces/Unicode and reproduces the production command boundary; filesystem validation/recovery keep the original canonical paths.

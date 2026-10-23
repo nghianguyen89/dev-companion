@@ -25,6 +25,7 @@ pub struct Scan {
     pub bytes: u64,
     pub skipped: usize,
     pub blocked: Option<String>,
+    pub usage: Vec<Usage>,
 }
 #[derive(Default, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -34,6 +35,110 @@ pub struct Outcome {
     pub reclaimed_bytes: u64,
     pub errors: Vec<String>,
 }
+#[derive(Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Usage {
+    pub name: String,
+    pub files: usize,
+    pub bytes: u64,
+    pub skipped: usize,
+    pub incomplete: bool,
+}
+
+// Metadata only: even a directory named cache or .tmp may hold required resources.
+fn measure_usage(path: &Path, depth: usize, remaining: &mut usize, usage: &mut Usage) {
+    if *remaining == 0 {
+        usage.incomplete = true;
+        return;
+    }
+    *remaining -= 1;
+    if depth > 32 {
+        usage.incomplete = true;
+        return;
+    }
+    let metadata = match fs_safety::check(path)
+        .and_then(|_| fs::symlink_metadata(path).map_err(|e| e.to_string()))
+    {
+        Ok(metadata) => metadata,
+        Err(_) => {
+            usage.skipped += 1;
+            return;
+        }
+    };
+    if metadata.is_file() {
+        usage.files += 1;
+        usage.bytes += metadata.len();
+    } else if metadata.is_dir() {
+        let entries = match fs::read_dir(path) {
+            Ok(entries) => entries,
+            Err(_) => {
+                usage.skipped += 1;
+                return;
+            }
+        };
+        for entry in entries {
+            if *remaining == 0 {
+                usage.incomplete = true;
+                break;
+            }
+            match entry {
+                Ok(entry) => measure_usage(&entry.path(), depth + 1, remaining, usage),
+                Err(_) => {
+                    usage.skipped += 1;
+                    *remaining -= 1;
+                }
+            }
+        }
+    } else {
+        usage.skipped += 1;
+    }
+}
+
+fn usage_at(home: &Path, limit: usize) -> Result<Vec<Usage>, String> {
+    fs_safety::check(home)?;
+    if !home.exists() {
+        return Ok(Vec::new());
+    }
+    let mut remaining = limit;
+    let mut groups = Vec::new();
+    let mut files = Usage::default();
+    for entry in fs::read_dir(home).map_err(|e| e.to_string())? {
+        if remaining == 0 {
+            files.incomplete = true;
+            break;
+        }
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(_) => {
+                files.skipped += 1;
+                remaining -= 1;
+                continue;
+            }
+        };
+        let metadata = match fs::symlink_metadata(entry.path()) {
+            Ok(metadata) => metadata,
+            Err(_) => {
+                files.skipped += 1;
+                remaining -= 1;
+                continue;
+            }
+        };
+        if metadata.is_dir() && !fs_safety::linked(&metadata) {
+            let mut usage = Usage {
+                name: entry.file_name().to_string_lossy().into(),
+                ..Usage::default()
+            };
+            measure_usage(&entry.path(), 0, &mut remaining, &mut usage);
+            groups.push(usage);
+        } else {
+            measure_usage(&entry.path(), 0, &mut remaining, &mut files);
+        }
+    }
+    groups.push(files);
+    groups.sort_by(|a, b| b.bytes.cmp(&a.bytes).then_with(|| a.name.cmp(&b.name)));
+    Ok(groups)
+}
+
 fn eligible(path: &Path) -> Result<Candidate, String> {
     fs_safety::check(path)?;
     let name = path
@@ -100,6 +205,7 @@ pub fn scan() -> Result<Scan, String> {
         bytes: candidates.iter().map(|c| c.bytes).sum(),
         skipped,
         blocked: environment::require_closed().err(),
+        usage: usage_at(&home, 50_000)?,
     };
     *SCAN.get_or_init(Default::default).lock().unwrap() = Some((token, candidates));
     Ok(result)
@@ -181,6 +287,45 @@ mod tests {
         fs::remove_dir_all(home).unwrap();
     }
     #[test]
+    fn usage_is_read_only_and_reports_limits() {
+        let home = std::env::temp_dir().join(format!(
+            "companion-usage-test-{}",
+            time::OffsetDateTime::now_utc().unix_timestamp_nanos()
+        ));
+        fs::create_dir_all(home.join(".tmp/plugins")).unwrap();
+        fs::create_dir_all(home.join("sessions")).unwrap();
+        fs::write(home.join(".tmp/plugins/resource"), b"required plugin").unwrap();
+        fs::write(home.join("sessions/chat.jsonl"), b"protected chat").unwrap();
+        fs::write(home.join("auth.json"), b"synthetic protected data").unwrap();
+        let usage = usage_at(&home, 50_000).unwrap();
+        assert_eq!(usage.iter().map(|u| u.files).sum::<usize>(), 3);
+        assert_eq!(usage.iter().map(|u| u.bytes).sum::<u64>(), 53);
+        assert!(usage.iter().all(|u| !u.incomplete && u.skipped == 0));
+        assert!(usage.windows(2).all(|u| u[0].bytes >= u[1].bytes));
+        let limited = usage_at(&home, 1).unwrap();
+        assert!(limited.iter().any(|u| u.incomplete));
+        assert!(limited.iter().map(|u| u.files).sum::<usize>() <= 1);
+        let mut remaining = 1;
+        let mut deep = Usage::default();
+        measure_usage(&home, 33, &mut remaining, &mut deep);
+        assert!(deep.incomplete);
+        assert_eq!(remaining, 0);
+        assert_eq!(execute_at(&home, &[]).deleted, 0);
+        assert_eq!(
+            fs::read(home.join(".tmp/plugins/resource")).unwrap(),
+            b"required plugin"
+        );
+        assert_eq!(
+            fs::read(home.join("auth.json")).unwrap(),
+            b"synthetic protected data"
+        );
+        assert_eq!(
+            fs::read(home.join("sessions/chat.jsonl")).unwrap(),
+            b"protected chat"
+        );
+        fs::remove_dir_all(home).unwrap();
+    }
+    #[test]
     fn cleanup_rejects_junction_root() {
         let home = std::env::temp_dir().join(format!(
             "companion-cleanup-link-{}",
@@ -198,6 +343,10 @@ mod tests {
                 .unwrap();
             assert!(status.success());
             assert!(scan_at(&home).is_err());
+            let usage = usage_at(&home, 50_000).unwrap();
+            let cache = usage.iter().find(|u| u.name == "cache").unwrap();
+            assert_eq!(cache.skipped, 1);
+            assert_eq!(cache.files, 0);
             fs::remove_dir(home.join(DIRECTORY)).unwrap();
         }
         fs::remove_dir_all(home).unwrap();

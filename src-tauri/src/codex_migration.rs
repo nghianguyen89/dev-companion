@@ -1,4 +1,4 @@
-//! Multi-account Codex folder migration. Credentials and runtime caches never enter this ZIP.
+//! Multi-account Codex migration. Authentication and runtime caches stay excluded.
 use crate::{environment, fs_safety, platform};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -291,7 +291,7 @@ struct SafetyEntry {
 
 #[derive(Clone)]
 enum Plan {
-    Snapshot(Vec<Account>, Vec<String>, Vec<Entry>),
+    Snapshot(Vec<Account>, Vec<String>, Vec<Entry>, bool),
     Archive(PathBuf, String, Manifest),
     Restore(PathBuf, String, Vec<RestoreItem>, Manifest),
 }
@@ -397,7 +397,7 @@ fn account(folder: String, label: String, home: PathBuf) -> Result<Account> {
     })
 }
 
-pub fn overview() -> Result<Overview> {
+pub fn overview(include_sensitive: bool) -> Result<Overview> {
     let user_home = home_dir()?;
     let mut candidates: BTreeMap<String, (PathBuf, String)> = BTreeMap::new();
     let mut add = |path: PathBuf, label: String| {
@@ -439,7 +439,7 @@ pub fn overview() -> Result<Overview> {
         })
         .collect::<Vec<_>>();
     accounts.sort_by_key(|account| (account.folder != ".codex", account.folder.clone()));
-    let estimates = estimate_accounts(&accounts)?;
+    let estimates = estimate_accounts(&accounts, include_sensitive)?;
     Ok(Overview {
         accounts,
         estimates,
@@ -721,7 +721,10 @@ fn validate_selection(
         .collect::<Result<Vec<_>>>()?;
     Ok(selected)
 }
-fn estimate_accounts(accounts: &[Account]) -> Result<Vec<AccountEstimate>> {
+fn estimate_accounts(
+    accounts: &[Account],
+    include_sensitive: bool,
+) -> Result<Vec<AccountEstimate>> {
     accounts
         .iter()
         .map(|account| {
@@ -733,7 +736,7 @@ fn estimate_accounts(accounts: &[Account]) -> Result<Vec<AccountEstimate>> {
                     continue;
                 };
                 let source = account.home.join(&relative_path);
-                if group == "settings" && !safe_settings(&source)? {
+                if group == "settings" && !include_sensitive && !safe_settings(&source)? {
                     continue;
                 }
                 let bytes = fs::metadata(source).map_err(|e| e.to_string())?.len();
@@ -759,7 +762,11 @@ fn estimate_accounts(accounts: &[Account]) -> Result<Vec<AccountEstimate>> {
         })
         .collect()
 }
-fn inventory(accounts: &[Account], groups: &[String]) -> Result<(Vec<Entry>, Vec<Group>)> {
+fn inventory(
+    accounts: &[Account],
+    groups: &[String],
+    include_sensitive: bool,
+) -> Result<(Vec<Entry>, Vec<Group>)> {
     let mut entries = Vec::new();
     let mut excluded: HashMap<String, Group> = HashMap::new();
     let mut skipped_links = 0;
@@ -798,7 +805,7 @@ fn inventory(accounts: &[Account], groups: &[String]) -> Result<(Vec<Entry>, Vec
                 item.bytes += bytes;
                 continue;
             }
-            if group == "settings" && !safe_settings(&source)? {
+            if group == "settings" && !include_sensitive && !safe_settings(&source)? {
                 let reason = "Settings may contain credentials: omitted intact; configure manually"
                     .to_owned();
                 let item = excluded.entry(reason.clone()).or_insert(Group {
@@ -838,11 +845,15 @@ fn inventory(accounts: &[Account], groups: &[String]) -> Result<(Vec<Entry>, Vec
     excluded.sort_by(|a, b| a.id.cmp(&b.id));
     Ok((entries, excluded))
 }
-pub fn preview(account_ids: Vec<String>, groups: Vec<String>) -> Result<Preview> {
+pub fn preview(
+    account_ids: Vec<String>,
+    groups: Vec<String>,
+    include_sensitive: bool,
+) -> Result<Preview> {
     environment::require_closed()?;
-    let all = overview()?.accounts;
+    let all = overview(include_sensitive)?.accounts;
     let accounts = validate_selection(&all, &account_ids, &groups)?;
-    let (entries, excluded) = inventory(&accounts, &groups)?;
+    let (entries, excluded) = inventory(&accounts, &groups, include_sensitive)?;
     let summaries = groups
         .iter()
         .map(|id| Group {
@@ -857,7 +868,12 @@ pub fn preview(account_ids: Vec<String>, groups: Vec<String>) -> Result<Preview>
         })
         .collect();
     Ok(Preview {
-        token: put(Plan::Snapshot(accounts.clone(), groups, entries.clone())),
+        token: put(Plan::Snapshot(
+            accounts.clone(),
+            groups,
+            entries.clone(),
+            include_sensitive,
+        )),
         accounts,
         groups: summaries,
         excluded,
@@ -866,15 +882,21 @@ pub fn preview(account_ids: Vec<String>, groups: Vec<String>) -> Result<Preview>
 }
 pub fn create(token: &str) -> Result<Created> {
     environment::require_closed()?;
-    let Plan::Snapshot(accounts, groups, expected) = get(token)? else {
+    let Plan::Snapshot(accounts, groups, expected, include_sensitive) = get(token)? else {
         return Err("Invalid backup preview.".into());
     };
-    let (entries, _) = inventory(&accounts, &groups)?;
+    let (entries, _) = inventory(&accounts, &groups, include_sensitive)?;
     if entries != expected {
         return Err("Source changed; review the backup again.".into());
     }
     let config = crate::config::load().map_err(|error| error.to_string())?;
-    create_at(&accounts, &platform::backup_dir(&config), entries, &groups)
+    create_at(
+        &accounts,
+        &platform::backup_dir(&config),
+        entries,
+        &groups,
+        include_sensitive,
+    )
 }
 fn copy_and_hash(input: &mut File, output: &mut ZipWriter<File>) -> Result<String> {
     let mut hash = Sha256::new();
@@ -896,6 +918,7 @@ fn create_at(
     output: &Path,
     entries: Vec<Entry>,
     groups: &[String],
+    include_sensitive: bool,
 ) -> Result<Created> {
     fs_safety::check(output)?;
     fs::create_dir_all(output).map_err(|e| e.to_string())?;
@@ -945,7 +968,7 @@ fn create_at(
             .map_err(|e| e.to_string())?
             .sync_all()
             .map_err(|e| e.to_string())?;
-        if inventory(accounts, groups)?.0 != entries {
+        if inventory(accounts, groups, include_sensitive)?.0 != entries {
             return Err(
                 "Source inventory changed; close Codex and review the backup again.".into(),
             );
@@ -1634,6 +1657,108 @@ mod tests {
     }
 
     #[test]
+    fn sensitive_settings_opt_in_roundtrips_without_filtering_contents() {
+        let (root, accounts, _) = fixture();
+        let home = &accounts[0].home;
+        fs::create_dir_all(home.join("rules")).unwrap();
+        fs::create_dir_all(home.join("prompts")).unwrap();
+        let settings = [
+            (
+                "AGENTS.md",
+                "You are a highly capable female secretary.\r\n",
+            ),
+            ("config.toml", "api_key = \"synthetic-fixture-only\"\n"),
+            ("rules/custom.rules", "Never expose a password."),
+            ("prompts/custom.md", "Do not log authorization headers."),
+        ];
+        for (path, contents) in settings {
+            fs::write(home.join(path), contents).unwrap();
+        }
+        let groups = vec!["settings".into()];
+        let (default_entries, excluded) = inventory(&accounts, &groups, false).unwrap();
+        assert!(default_entries.is_empty());
+        assert_eq!(
+            excluded
+                .iter()
+                .find(|group| group.reason.contains("credentials"))
+                .unwrap()
+                .files,
+            4
+        );
+        let default_estimates = estimate_accounts(&accounts, false).unwrap();
+        assert_eq!(
+            default_estimates[0]
+                .groups
+                .iter()
+                .find(|group| group.id == "settings")
+                .unwrap()
+                .files,
+            0
+        );
+
+        let (entries, _) = inventory(&accounts, &groups, true).unwrap();
+        assert_eq!(entries.len(), settings.len());
+        assert!(entries.iter().all(|entry| entry.group == "settings"));
+        let estimates = estimate_accounts(&accounts, true).unwrap();
+        let estimate = estimates[0]
+            .groups
+            .iter()
+            .find(|group| group.id == "settings")
+            .unwrap();
+        assert_eq!(estimate.files, settings.len());
+        assert_eq!(
+            estimate.bytes,
+            entries.iter().map(|entry| entry.bytes).sum::<u64>()
+        );
+        let other_groups = vec!["chat".into()];
+        assert!(!inventory(&accounts, &other_groups, true)
+            .unwrap()
+            .0
+            .iter()
+            .any(|entry| entry.group == "settings"));
+        let all_groups = GROUPS
+            .iter()
+            .map(|group| (*group).to_owned())
+            .collect::<Vec<_>>();
+        let (all_entries, _) = inventory(&accounts, &all_groups, true).unwrap();
+        assert!(all_entries
+            .iter()
+            .all(|entry| !protected(&entry.relative_path) && !runtime(&entry.relative_path)));
+
+        let archive =
+            create_at(&accounts, &root.join("out"), entries.clone(), &groups, true).unwrap();
+        let path = PathBuf::from(archive.archive_path);
+        let manifest = inspect_at(&path).unwrap();
+        assert_eq!(manifest.format_version, 1);
+        assert_eq!(manifest.entries, entries);
+        let destination = root.join("destination");
+        fs::create_dir_all(destination.join(".codex")).unwrap();
+        fs::write(destination.join(".codex/AGENTS.md"), "").unwrap();
+        let items = restore_items(&destination, &manifest).unwrap();
+        assert!(items
+            .iter()
+            .any(|item| item.path.ends_with("AGENTS.md") && item.status == "conflict"));
+        let result = restore_at(
+            &destination,
+            &path,
+            &items,
+            true,
+            &root.join("safety"),
+            None,
+        )
+        .unwrap();
+        assert!(result.errors.is_empty(), "{:?}", result.errors);
+        assert_eq!(result.restored, settings.len());
+        for (relative, contents) in settings {
+            assert_eq!(
+                fs::read(destination.join(".codex").join(relative)).unwrap(),
+                contents.as_bytes()
+            );
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn archive_groups_report_local_project_entries() {
         let entries = vec![Entry {
             account_id: ".codex".into(),
@@ -1668,8 +1793,8 @@ mod tests {
                 .unwrap();
             assert!(status.success());
         }
-        let (entries, excluded) = inventory(&accounts, &groups).unwrap();
-        let estimates = estimate_accounts(&accounts).unwrap();
+        let (entries, excluded) = inventory(&accounts, &groups, false).unwrap();
+        let estimates = estimate_accounts(&accounts, false).unwrap();
         assert_eq!(
             estimates[0]
                 .groups
@@ -1722,7 +1847,14 @@ mod tests {
         assert!(excluded
             .iter()
             .any(|group| group.reason == "Link or junction excluded for safe backup"));
-        let archive = create_at(&accounts, &root.join("out"), entries.clone(), &groups).unwrap();
+        let archive = create_at(
+            &accounts,
+            &root.join("out"),
+            entries.clone(),
+            &groups,
+            false,
+        )
+        .unwrap();
         let archive_path = PathBuf::from(archive.archive_path);
         let manifest = inspect_at(&archive_path).unwrap();
         assert_eq!(manifest.entries, entries);
@@ -1863,8 +1995,8 @@ mod tests {
         assert!(!valid_folder(".codex-cus/escape"));
         assert!(valid_folder(".codex-cus"));
         let (root, accounts, groups) = fixture();
-        let entries = inventory(&accounts, &groups).unwrap().0;
-        let archive = create_at(&accounts, &root.join("out"), entries, &groups).unwrap();
+        let entries = inventory(&accounts, &groups, false).unwrap().0;
+        let archive = create_at(&accounts, &root.join("out"), entries, &groups, false).unwrap();
         fs::write(&archive.archive_path, b"not a zip").unwrap();
         assert!(inspect_at(Path::new(&archive.archive_path)).is_err());
         fs::remove_dir_all(root).unwrap();
@@ -1873,8 +2005,8 @@ mod tests {
     #[test]
     fn safety_rollback_continues_after_one_target_is_blocked() {
         let (root, accounts, groups) = fixture();
-        let entries = inventory(&accounts, &groups).unwrap().0;
-        let archive = create_at(&accounts, &root.join("out"), entries, &groups).unwrap();
+        let entries = inventory(&accounts, &groups, false).unwrap().0;
+        let archive = create_at(&accounts, &root.join("out"), entries, &groups, false).unwrap();
         let manifest = inspect_at(Path::new(&archive.archive_path)).unwrap();
         let (safety, originals) =
             create_chat_safety_archive(&root, &manifest, &root.join("safety")).unwrap();
@@ -1894,7 +2026,7 @@ mod tests {
     #[test]
     fn output_handle_verifies_bytes_and_blocks_competing_mutations() {
         let (root, accounts, groups) = fixture();
-        let mut entry = inventory(&accounts, &groups).unwrap().0.remove(0);
+        let mut entry = inventory(&accounts, &groups, false).unwrap().0.remove(0);
         let source = accounts
             .iter()
             .find(|account| account.id == entry.account_id)
@@ -1927,8 +2059,8 @@ mod tests {
     #[test]
     fn output_digest_failure_rolls_back_all_original_files() {
         let (root, accounts, groups) = fixture();
-        let entries = inventory(&accounts, &groups).unwrap().0;
-        let archive = create_at(&accounts, &root.join("out"), entries, &groups).unwrap();
+        let entries = inventory(&accounts, &groups, false).unwrap().0;
+        let archive = create_at(&accounts, &root.join("out"), entries, &groups, false).unwrap();
         let path = Path::new(&archive.archive_path);
         let mut manifest = inspect_at(path).unwrap();
         // Inject a verifier failure after strict archive validation, without modifying the ZIP.
@@ -2020,8 +2152,8 @@ mod tests {
         entered_rx.recv_timeout(Duration::from_secs(5)).unwrap();
         trace_progress(&trace, &event, true).unwrap(); // Fill the one-record queue behind the paused write.
         let (root, accounts, groups) = fixture();
-        let entries = inventory(&accounts, &groups).unwrap().0;
-        let archive = create_at(&accounts, &root.join("out"), entries, &groups).unwrap();
+        let entries = inventory(&accounts, &groups, false).unwrap().0;
+        let archive = create_at(&accounts, &root.join("out"), entries, &groups, false).unwrap();
         let path = PathBuf::from(archive.archive_path);
         let manifest = inspect_at(&path).unwrap();
         let destination = root.join("destination");
@@ -2211,8 +2343,8 @@ mod tests {
     #[test]
     fn restore_file_substeps_are_recorded_in_metadata_trace() {
         let (root, accounts, groups) = fixture();
-        let entries = inventory(&accounts, &groups).unwrap().0;
-        let archive = create_at(&accounts, &root.join("out"), entries, &groups).unwrap();
+        let entries = inventory(&accounts, &groups, false).unwrap().0;
+        let archive = create_at(&accounts, &root.join("out"), entries, &groups, false).unwrap();
         let path = Path::new(&archive.archive_path);
         let manifest = inspect_at(path).unwrap();
         let destination = root.join("destination");
@@ -2312,8 +2444,8 @@ mod tests {
     #[test]
     fn safety_scan_prunes_runtime_and_reports_verified_stored_snapshot() {
         let (root, accounts, groups) = fixture();
-        let entries = inventory(&accounts, &groups).unwrap().0;
-        let archive = create_at(&accounts, &root.join("out"), entries, &groups).unwrap();
+        let entries = inventory(&accounts, &groups, false).unwrap().0;
+        let archive = create_at(&accounts, &root.join("out"), entries, &groups, false).unwrap();
         let manifest = inspect_at(Path::new(&archive.archive_path)).unwrap();
         fs::write(root.join(".codex/sessions/chat.jsonl.tmp"), "stale").unwrap();
         fs::create_dir_all(root.join(".codex/sessions/cache")).unwrap();

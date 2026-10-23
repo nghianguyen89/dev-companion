@@ -18,6 +18,8 @@ pub struct AppConfiguration {
     pub codex_environments: Vec<crate::codex_environment::Environment>,
     #[serde(default)]
     pub file_transfer_profiles: Vec<crate::file_transfer::TransferProfile>,
+    #[serde(default)]
+    pub compression_profiles: Vec<crate::compression::CompressionProfile>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -52,6 +54,7 @@ impl Default for AppConfiguration {
             log_level: LogLevel::Warn,
             codex_environments: Vec::new(),
             file_transfer_profiles: Vec::new(),
+            compression_profiles: Vec::new(),
         }
     }
 }
@@ -125,6 +128,38 @@ mod tests {
         assert_eq!(serialized["language"], "vi");
         let restored: AppConfiguration = serde_json::from_value(serialized).unwrap();
         assert!(matches!(restored.language, Language::Vi));
+    }
+
+    #[test]
+    fn legacy_settings_and_compression_profiles_round_trip() {
+        let mut value = serde_json::to_value(AppConfiguration::default()).unwrap();
+        value.as_object_mut().unwrap().remove("compressionProfiles");
+        let mut configuration: AppConfiguration = serde_json::from_value(value).unwrap();
+        assert!(configuration.compression_profiles.is_empty());
+        configuration.compression_profiles.push(
+            serde_json::from_value(serde_json::json!({
+                "id": "project", "name": "My project",
+                "config": {
+                    "source": "", "outputFolder": "", "mode": "strong",
+                    "excludedPaths": ["private"], "regexExclusions": [r"\.tmp$"],
+                    "excludedDirectoryNames": ["node_modules"], "excludedFileExtensions": [".log"],
+                    "includedPaths": ["nested/node_modules"]
+                }
+            }))
+            .unwrap(),
+        );
+        let restored: AppConfiguration =
+            serde_json::from_slice(&serde_json::to_vec(&configuration).unwrap()).unwrap();
+        assert_eq!(restored.compression_profiles[0].name, "My project");
+        assert_eq!(
+            restored.compression_profiles[0].config.included_paths,
+            vec!["nested/node_modules"]
+        );
+        assert!(matches!(
+            restored.compression_profiles[0].config.mode,
+            crate::compression::Mode::Strong
+        ));
+        assert!(restored.compression_profiles[0].config.source.is_empty());
     }
 
     #[test]

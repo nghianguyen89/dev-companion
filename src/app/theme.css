@@ -26,3 +26,17 @@
 .cleanup-selection { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 12px; border: 1px solid #3b4659; border-radius: 7px; cursor: pointer; }
 .cleanup-selection span { display: grid; gap: 4px; }.cleanup-selection small { color: #aeb8ca; }
 .app-shell[data-theme="light"] .cleanup-selection { border-color: #b9c7d6; }.app-shell[data-theme="light"] .cleanup-selection small { color: #52667d; }
+
+.cleanup-storage .conversation-table-wrap { max-height: 420px; }
+.cleanup-storage .conversation-table { min-width: 560px; }
+
+.project-cleanup .conversation-table-wrap { max-height: 420px; }
+.project-cleanup .conversation-table { min-width: 620px; }
+.project-cleanup .conversation-table td:nth-child(2) { min-width: 220px; overflow-wrap: anywhere; }
+.project-cleanup .conversation-table td small { display: block; margin-top: 6px; }
+.project-cleanup-source, .project-cleanup-actions label { display: grid; gap: 8px; }
+.project-cleanup-source input, .project-cleanup-actions input { padding: 10px; border: 1px solid #6d7b91; border-radius: 6px; color: inherit; background: transparent; }
+.project-cleanup-actions { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin: 16px 0; }
+.project-cleanup-preview-paths { max-height: 180px; overflow: auto; overflow-wrap: anywhere; }
+
+.project-cleanup-source select { margin-top: 8px; padding: 10px; border: 1px solid #6d7b91; border-radius: 6px; color: inherit; background: transparent; }

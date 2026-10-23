@@ -1,5 +1,6 @@
 mod beyond_compare;
 mod cleanup;
+mod project_cleanup;
 mod codex;
 mod codex_content;
 mod codex_environment;
@@ -55,6 +56,11 @@ pub fn run() {
             commands::stop_codex_processes,
             commands::scan_cleanup,
             commands::execute_cleanup,
+            commands::pick_project_cleanup_folder,
+            commands::scan_project_cleanup,
+            commands::cancel_project_cleanup,
+            commands::preview_project_cleanup,
+            commands::execute_project_cleanup,
             commands::get_skills,
             commands::import_skill,
             commands::export_skill,
@@ -109,6 +115,7 @@ pub fn run() {
             commands::get_codex_environment_overview,
             commands::save_codex_environment,
             commands::regenerate_codex_launcher,
+            commands::check_codex_alias,
             commands::remove_codex_launcher,
             commands::add_codex_launcher_dir_to_user_path,
             commands::get_codex_environment_instructions,

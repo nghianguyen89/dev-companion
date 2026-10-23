@@ -553,6 +553,7 @@ mod tests {
             log_level: crate::config::LogLevel::Info,
             codex_environments: Vec::new(),
             file_transfer_profiles: Vec::new(),
+            compression_profiles: Vec::new(),
         }
     }
     fn session(home: &Path, name: &str, id: &str) -> PathBuf {

@@ -633,6 +633,8 @@ dependencies = [
  "time",
  "tracing",
  "tracing-subscriber",
+ "windows",
+ "windows-core 0.61.2",
  "zip",
 ]
 

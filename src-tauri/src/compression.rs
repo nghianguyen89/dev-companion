@@ -1,5 +1,4 @@
 use std::{
-    collections::HashSet,
     fs::{self, File, OpenOptions},
     io::{self, BufReader, Read, Write},
     path::{Path, PathBuf},
@@ -50,14 +49,14 @@ pub struct SourceTree {
     pub skipped_reparse_points: usize,
 }
 
-#[derive(Clone, Copy, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Mode {
     Fast,
     Strong,
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CompressionConfig {
     pub source: String,
@@ -65,6 +64,20 @@ pub struct CompressionConfig {
     pub mode: Mode,
     pub excluded_paths: Vec<String>,
     pub regex_exclusions: Vec<String>,
+    #[serde(default)]
+    pub excluded_directory_names: Vec<String>,
+    #[serde(default)]
+    pub excluded_file_extensions: Vec<String>,
+    #[serde(default)]
+    pub included_paths: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompressionProfile {
+    pub id: String,
+    pub name: String,
+    pub config: CompressionConfig,
 }
 
 #[derive(Serialize)]
@@ -160,7 +173,17 @@ fn usable_seven_zip(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-pub fn scan_source(source: &str) -> Result<SourceTree, String> {
+pub fn scan_source(source: &str, folder: Option<&str>) -> Result<SourceTree, String> {
+    collect_source(source, folder, None, false, None)
+}
+
+fn collect_source(
+    source: &str,
+    folder: Option<&str>,
+    filter: Option<(&CompressionConfig, &[Regex])>,
+    recursive: bool,
+    cancellation: Option<&AtomicBool>,
+) -> Result<SourceTree, String> {
     let source = Path::new(source);
     fs_safety::check(source)?;
     let metadata = fs::symlink_metadata(source).map_err(|_| "Source folder is unavailable.")?;
@@ -172,7 +195,29 @@ pub fn scan_source(source: &str) -> Result<SourceTree, String> {
         .map_err(|_| "Source folder is unavailable.")?;
     let mut entries = Vec::new();
     let mut skipped = 0;
-    walk(&source, &source, &mut entries, &mut skipped)?;
+    let directory = if let Some(relative) = folder {
+        fs_safety::relative(relative)?;
+        let directory = source.join(relative);
+        fs_safety::check(&directory)?;
+        let canonical = directory
+            .canonicalize()
+            .map_err(|_| "Source folder is unavailable.")?;
+        if !canonical.starts_with(&source) || !canonical.is_dir() {
+            return Err("Source folder is outside the selected root.".into());
+        }
+        canonical
+    } else {
+        source.clone()
+    };
+    walk(
+        &source,
+        &directory,
+        &mut entries,
+        &mut skipped,
+        filter,
+        recursive,
+        cancellation,
+    )?;
     Ok(SourceTree {
         default_output_folder: display_path(
             source.parent().ok_or("Source folder must have a parent.")?,
@@ -188,13 +233,19 @@ fn walk(
     folder: &Path,
     entries: &mut Vec<TreeEntry>,
     skipped: &mut usize,
+    filter: Option<(&CompressionConfig, &[Regex])>,
+    recursive: bool,
+    cancellation: Option<&AtomicBool>,
 ) -> Result<(), String> {
-    let mut children = fs::read_dir(folder)
-        .map_err(|_| "Unable to read a source folder.")?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|_| "Unable to read a source folder.")?;
+    check_cancelled(cancellation)?;
+    let mut children = Vec::new();
+    for child in fs::read_dir(folder).map_err(|_| "Unable to read a source folder.")? {
+        check_cancelled(cancellation)?;
+        children.push(child.map_err(|_| "Unable to read a source folder.")?);
+    }
     children.sort_by_key(|entry| entry.file_name());
     for entry in children {
+        check_cancelled(cancellation)?;
         let metadata =
             fs::symlink_metadata(entry.path()).map_err(|_| "Unable to inspect a source item.")?;
         if fs_safety::linked(&metadata) {
@@ -216,20 +267,127 @@ fn walk(
             })
             .collect::<Result<Vec<_>, _>>()?
             .join("/");
+        if filter.is_some_and(|(config, regexes)| {
+            excluded(config, &relative, metadata.is_dir(), regexes)
+        }) {
+            continue;
+        }
         entries.push(TreeEntry {
             path: relative,
             is_directory: metadata.is_dir(),
             bytes: metadata.len(),
         });
-        if metadata.is_dir() {
-            walk(root, &entry.path(), entries, skipped)?;
+        if recursive && metadata.is_dir() {
+            walk(
+                root,
+                &entry.path(),
+                entries,
+                skipped,
+                filter,
+                recursive,
+                cancellation,
+            )?;
         }
     }
     Ok(())
 }
 
+fn check_cancelled(cancellation: Option<&AtomicBool>) -> Result<(), String> {
+    if cancellation.is_some_and(|value| value.load(Ordering::SeqCst)) {
+        return Err("Compression cancelled.".into());
+    }
+    Ok(())
+}
+
+fn within(path: &str, parent: &str) -> bool {
+    path.eq_ignore_ascii_case(parent)
+        || path
+            .to_lowercase()
+            .starts_with(&format!("{}/", parent.to_lowercase()))
+}
+
+fn excluded(config: &CompressionConfig, path: &str, directory: bool, regexes: &[Regex]) -> bool {
+    if config
+        .excluded_paths
+        .iter()
+        .any(|parent| within(path, &parent.replace('\\', "/")))
+    {
+        return true;
+    }
+    let mut prefix = String::new();
+    if path.split('/').any(|part| {
+        if !prefix.is_empty() {
+            prefix.push('/');
+        }
+        prefix.push_str(part);
+        regexes.iter().any(|regex| {
+            regex.is_match(&prefix)
+                || ((directory || prefix != path) && regex.is_match(&format!("{prefix}/")))
+        })
+    }) {
+        return true;
+    }
+    if config
+        .included_paths
+        .iter()
+        .any(|parent| within(path, &parent.replace('\\', "/")))
+    {
+        return false;
+    }
+    // Keep ancestors traversable for a saved explicit descendant selection.
+    if directory
+        && config
+            .included_paths
+            .iter()
+            .any(|included| within(&included.replace('\\', "/"), path))
+    {
+        return false;
+    }
+    let parts: Vec<_> = path.split('/').collect();
+    let folders = if directory {
+        &parts[..]
+    } else {
+        &parts[..parts.len() - 1]
+    };
+    folders.iter().any(|name| {
+        config
+            .excluded_directory_names
+            .iter()
+            .any(|value| name.eq_ignore_ascii_case(value))
+    }) || (!directory
+        && config
+            .excluded_file_extensions
+            .iter()
+            .any(|extension| path.to_lowercase().ends_with(&extension.to_lowercase())))
+}
+
 fn prepare(config: &CompressionConfig) -> Result<Prepared, String> {
-    let tree = scan_source(&config.source)?;
+    prepare_cancellable(config, None)
+}
+
+fn prepare_cancellable(
+    config: &CompressionConfig,
+    cancellation: Option<&AtomicBool>,
+) -> Result<Prepared, String> {
+    for path in config.excluded_paths.iter().chain(&config.included_paths) {
+        fs_safety::relative(&path.replace('\\', "/"))?;
+    }
+    let regexes = config
+        .regex_exclusions
+        .iter()
+        .map(|pattern| {
+            Regex::new(pattern)
+                .map_err(|error| format!("Invalid exclusion regex `{pattern}`: {error}"))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    check_cancelled(cancellation)?;
+    let tree = collect_source(
+        &config.source,
+        None,
+        Some((config, &regexes)),
+        true,
+        cancellation,
+    )?;
     let source = PathBuf::from(&tree.source);
     let source_name = source
         .file_name()
@@ -253,58 +411,11 @@ fn prepare(config: &CompressionConfig) -> Result<Prepared, String> {
             "The archive already exists. Choose another output folder or move it first.".into(),
         );
     }
-    let available: HashSet<_> = tree
-        .entries
-        .iter()
-        .map(|entry| entry.path.to_lowercase())
-        .collect();
-    let mut excluded = HashSet::new();
-    for path in &config.excluded_paths {
-        let normalized = path.replace('\\', "/");
-        fs_safety::relative(&normalized)?;
-        let normalized = normalized.to_lowercase();
-        if !available.contains(&normalized) {
-            return Err(format!("Excluded item is no longer in the source: {path}"));
-        }
-        excluded.insert(normalized);
-    }
-    let regexes = config
-        .regex_exclusions
-        .iter()
-        .map(|pattern| {
-            Regex::new(pattern)
-                .map_err(|error| format!("Invalid exclusion regex `{pattern}`: {error}"))
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-    let mut selected = Vec::new();
-    for entry in &tree.entries {
-        let lower = entry.path.to_lowercase();
-        if excluded
-            .iter()
-            .any(|path| lower == *path || lower.starts_with(&format!("{path}/")))
-        {
-            continue;
-        }
-        if regexes.iter().any(|regex| {
-            entry
-                .path
-                .split('/')
-                .scan(String::new(), |prefix, part| {
-                    if !prefix.is_empty() {
-                        prefix.push('/');
-                    }
-                    prefix.push_str(part);
-                    Some(regex.is_match(prefix))
-                })
-                .any(|matched| matched)
-        }) {
-            continue;
-        }
-        selected.push(entry);
-    }
+    let selected: Vec<_> = tree.entries.iter().collect();
     let included_files = selected.iter().filter(|entry| !entry.is_directory).count();
     let mut empty_folders = Vec::new();
     for entry in selected.iter().filter(|entry| entry.is_directory) {
+        check_cancelled(cancellation)?;
         if source_folder_is_empty(&source.join(&entry.path))? {
             empty_folders.push(*entry);
         }
@@ -362,7 +473,6 @@ fn source_folder_is_empty(path: &Path) -> Result<bool, String> {
 }
 
 pub fn start(app: AppHandle, config: CompressionConfig) -> Result<Started, String> {
-    let prepared = prepare(&config)?;
     let seven_zip = seven_zip_path().ok_or("Install 7-Zip (7z.exe) to create archives.")?;
     let cancellation = Arc::new(AtomicBool::new(false));
     let mut guard = active()
@@ -375,7 +485,9 @@ pub fn start(app: AppHandle, config: CompressionConfig) -> Result<Started, Strin
     let spawned = thread::Builder::new()
         .name("file-compression".into())
         .spawn(move || {
-            let result = run(&app, &prepared, &seven_zip, &cancellation);
+            let result = prepare_cancellable(&config, Some(&cancellation))
+                .map_err(|message| (message, None))
+                .and_then(|prepared| run(&app, &prepared, &seven_zip, &cancellation));
             let event = match result {
                 Ok((archive, exit_code, message)) => CompletionEvent {
                     state: "completed".into(),
@@ -720,6 +832,9 @@ mod tests {
             mode: Mode::Fast,
             excluded_paths: vec![],
             regex_exclusions: vec![r"(?i)\.log$".into()],
+            excluded_directory_names: vec![],
+            excluded_file_extensions: vec![],
+            included_paths: vec![],
         };
         let prepared = prepare(&config).unwrap();
         assert_eq!(prepared.preview.included_files, 1);
@@ -738,6 +853,122 @@ mod tests {
         };
         assert!(prepare(&config).is_err());
         fs::remove_dir_all(root).unwrap();
+    }
+
+    fn project_config(source: &Path) -> CompressionConfig {
+        CompressionConfig {
+            source: source.display().to_string(),
+            output_folder: String::new(),
+            mode: Mode::Fast,
+            excluded_paths: vec![],
+            regex_exclusions: vec![],
+            excluded_directory_names: vec!["node_modules".into(), "build".into()],
+            excluded_file_extensions: vec![".log".into()],
+            included_paths: vec![],
+        }
+    }
+
+    #[test]
+    fn browsing_is_lazy_and_rejects_escape_paths() {
+        let root = temp_root("lazy");
+        fs::create_dir_all(root.join("source/node_modules/pkg")).unwrap();
+        fs::create_dir_all(root.join("source/src")).unwrap();
+        for index in 0..2000 {
+            fs::write(
+                root.join(format!("source/node_modules/pkg/{index}.js")),
+                "dependency",
+            )
+            .unwrap();
+        }
+        let source = display_path(&root.join("source"));
+        let tree = scan_source(&source, None).unwrap();
+        assert_eq!(tree.entries.len(), 2);
+        assert!(tree.entries.iter().all(|entry| entry.is_directory));
+        let children = scan_source(&source, Some("node_modules")).unwrap();
+        assert_eq!(children.entries.len(), 1);
+        assert_eq!(children.entries[0].path, "node_modules/pkg");
+        assert!(scan_source(&source, Some("../")).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn generated_trees_are_pruned_and_explicit_includes_are_honored() {
+        let root = temp_root("pruned");
+        fs::create_dir_all(root.join("source/src/node_modules/pkg")).unwrap();
+        fs::create_dir_all(root.join("source/build")).unwrap();
+        fs::write(root.join("source/src/main.ts"), "source").unwrap();
+        fs::write(
+            root.join("source/src/node_modules/pkg/index.js"),
+            "dependency",
+        )
+        .unwrap();
+        fs::write(root.join("source/build/bundle.js"), "generated").unwrap();
+        fs::write(root.join("source/debug.LOG"), "log").unwrap();
+        let mut config = project_config(&root.join("source"));
+        let tree = collect_source(&config.source, None, Some((&config, &[])), true, None).unwrap();
+        assert_eq!(
+            tree.entries
+                .iter()
+                .map(|entry| entry.path.as_str())
+                .collect::<Vec<_>>(),
+            vec!["src", "src/main.ts"]
+        );
+        assert_eq!(prepare(&config).unwrap().preview.included_files, 1);
+        config.included_paths = vec!["src/node_modules/pkg/index.js".into()];
+        assert_eq!(prepare(&config).unwrap().preview.included_files, 2);
+        config.excluded_paths = vec!["src/node_modules".into()];
+        assert_eq!(prepare(&config).unwrap().preview.included_files, 1);
+        config.excluded_paths.clear();
+        config.regex_exclusions = vec!["(^|/)node_modules/".into()];
+        assert_eq!(prepare(&config).unwrap().preview.included_files, 1);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn early_pruning_does_not_visit_linked_descendants() {
+        let root = temp_root("prune-before-descent");
+        fs::create_dir_all(root.join("source/node_modules")).unwrap();
+        fs::write(root.join("source/main.ts"), "source").unwrap();
+        let target = root.join("outside");
+        fs::create_dir(&target).unwrap();
+        let link = root.join("source/node_modules/linked");
+        #[cfg(windows)]
+        let linked = std::os::windows::fs::symlink_dir(&target, &link).is_ok();
+        #[cfg(not(windows))]
+        let linked = std::os::unix::fs::symlink(&target, &link).is_ok();
+        if linked {
+            let config = project_config(&root.join("source"));
+            let tree =
+                collect_source(&config.source, None, Some((&config, &[])), true, None).unwrap();
+            assert_eq!(tree.skipped_reparse_points, 0);
+            let full = collect_source(&config.source, None, None, true, None).unwrap();
+            assert_eq!(full.skipped_reparse_points, 1);
+            fs::remove_dir(&link).unwrap();
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn preparation_can_be_cancelled_before_traversal() {
+        let cancelled = AtomicBool::new(true);
+        let config = project_config(Path::new("not-read"));
+        assert!(
+            matches!(prepare_cancellable(&config, Some(&cancelled)), Err(message) if message == "Compression cancelled.")
+        );
+    }
+
+    #[test]
+    fn legacy_config_defaults_new_rules_and_rejects_unsafe_includes() {
+        let config: CompressionConfig = serde_json::from_value(serde_json::json!({
+            "source": "", "outputFolder": "", "mode": "fast", "excludedPaths": [], "regexExclusions": []
+        })).unwrap();
+        assert!(config.excluded_directory_names.is_empty());
+        assert!(config.included_paths.is_empty());
+        assert!(prepare(&CompressionConfig {
+            included_paths: vec!["../outside".into()],
+            ..config
+        })
+        .is_err());
     }
 
     #[test]
@@ -782,6 +1013,9 @@ mod tests {
             mode: Mode::Fast,
             excluded_paths: vec![],
             regex_exclusions: vec![r"\.log$".into()],
+            excluded_directory_names: vec![],
+            excluded_file_extensions: vec![],
+            included_paths: vec![],
         });
         assert!(
             matches!(result, Err(message) if message == "No files or folders remain after exclusions.")
@@ -809,9 +1043,14 @@ mod tests {
                 mode: Mode::Fast,
                 excluded_paths: vec![],
                 regex_exclusions: vec![],
+                excluded_directory_names: vec![],
+                excluded_file_extensions: vec![],
+                included_paths: vec![],
             };
             assert_eq!(
-                scan_source(&config.source).unwrap().skipped_reparse_points,
+                collect_source(&config.source, None, None, true, None)
+                    .unwrap()
+                    .skipped_reparse_points,
                 1
             );
             assert!(
@@ -833,6 +1072,12 @@ mod tests {
         let root = temp_root("cli");
         fs::create_dir_all(root.join("source").join("nested")).unwrap();
         fs::create_dir_all(root.join("source").join("private")).unwrap();
+        fs::create_dir_all(root.join("source/node_modules/pkg")).unwrap();
+        fs::write(
+            root.join("source/node_modules/pkg/dependency.js"),
+            "dependency",
+        )
+        .unwrap();
         fs::write(root.join("source").join("nested").join("keep.txt"), "keep").unwrap();
         fs::write(root.join("source").join("nested").join("skip.log"), "skip").unwrap();
         fs::write(
@@ -846,6 +1091,9 @@ mod tests {
             mode: Mode::Strong,
             excluded_paths: vec![],
             regex_exclusions: vec![r"\.log$".into()],
+            excluded_directory_names: vec!["node_modules".into()],
+            excluded_file_extensions: vec![],
+            included_paths: vec![],
         })
         .unwrap();
         assert!(!prepared
@@ -877,6 +1125,8 @@ mod tests {
         assert!(!listing.contains("skip.log"));
         assert!(!listing.contains("secret.log"));
         assert!(!listing.contains("private"));
+        assert!(!listing.contains("dependency.js"));
+        assert!(!listing.contains("node_modules"));
         fs::remove_dir_all(root).unwrap();
     }
 }

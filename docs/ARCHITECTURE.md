@@ -1,5 +1,9 @@
 # Architecture
 
+## 2026-10-14: Cleanup disk inventory
+
+Cleanup is in the Codex navigation group. Its on-demand scan also returns read-only file counts and byte totals per CODEX_HOME direct directory, with root files aggregated. It reads metadata only, bounds traversal to 50,000 entries / 32 levels, skips links and inaccessible paths, and reports partial totals. Inventory rows never become deletion candidates; the verified remote-catalog allowlist remains unchanged.
+
 ## Current 0.2.0 contract
 
 The Windows scope now includes environment archive v2, create-only file recovery and explicit catalog-cache cleanup. See [USER_GUIDE.md](USER_GUIDE.md) and [STORAGE_AUDIT.md](STORAGE_AUDIT.md) for the current included/excluded paths and limits. Desktop chat/database merging is **unfinished and unverified**. The milestone descriptions below are historical contracts, not the current feature scope.
@@ -77,6 +81,16 @@ instructions, or CLI authentication. Launcher files live in `%USERPROFILE%\\bin`
 and User PATH changes use `HKCU\\Environment` only. `AGENTS.md` edits replace a
 single marker-delimited block after a timestamped backup, preserving user text
 outside it; missing or malformed markers abort the change.
+
+Windows CLI probes resolve supported executable/batch suffixes in PATHEXT order,
+skipping npm's extensionless shell shim. Batch calls use hidden CMD with an
+explicit quoted target; interactive calls get a separate console. Persisted
+Machine/User PATH precedes inherited PATH for refreshed child probes. Saving a
+custom environment regenerates its launcher, which pins the resolved CLI, and
+ensures the launcher directory is in User PATH (with an Explorer notification).
+Alias checks validate managed content and PATH collisions before --version;
+they never invoke login/logout or read credential files. Unknown means the
+CLI login-status probe could not establish an answer, not a missing environment.
 
 ## Codex Migration
 
@@ -218,3 +232,15 @@ credential/key file names are excluded. Recovery validates the token, archive
 hash/inventory, matching destination version/architecture, and destination
 state, then writes create-new files only to Companion-owned staging with
 rollback. XAMPP placement and MariaDB import remain manual.
+
+## Project Cleanup — 2026-10-14
+
+Project Cleanup is a separate Tools page and `project_cleanup.rs` native boundary. Compression exclusions remain unchanged and never become a deletion allowlist. The picker and scan operate only on the explicit user folder; React receives ID-bound candidate metadata. Native preparation registers per-scan cancellation before the serialized command gate. Preview binds selected IDs to a fresh plan; execution accepts only its token and mode-specific confirmation (DELETE GENERATED / RECYCLE GENERATED). Recycle is the UI default; omitted native preview mode retains permanent for compatibility.
+
+All selected inventories/markers are revalidated before any mutation. Permanent removal is per regular file and bottom-up empty directories, with ancestor/reparse checks; no production recursive delete, root removal or traversal through links. The first mid-delete error returns actual partial counts. Permanent deletion has no rollback/safety-archive promise. Linked roots/ancestors, external dependency targets, linked caches, protected/unknown data and incomplete scans cannot authorize deletion. Internal pnpm dependency junctions/symlinks are snapshotted and unlinked as leaf objects; target contents are never traversed during scan/permanent removal.
+
+Recycle uses Windows IFileOperation and verifies its Recycle Bin result; same-volume recovery staging must exist before Shell mutation. Errors restore or retain the staged content and report its path. Recycled counters never claim freed disk space. Archive handoff carries the completed preview root, starts Compression with Everything filters and fresh source scan, and requires normal preview/start. Compression readiness blocks source changes only while its probe is pending.
+
+## 2026-10-14 — pnpm Project Cleanup support
+
+Normal Windows pnpm installs include junctions from package names into the candidate's .pnpm tree. Project Cleanup now treats supported internal dependency links as leaf objects with zero target bytes; regular .pnpm package files are still inventoried once. It does not change fs_safety or follow links while scanning/unlinking. Linked candidate roots/ancestors, unknown reparse tags, external/workspace targets, target ancestry containing another link and linked caches stay blocked. Windows recycle staging clones the original junction/symlink reparse data, preserving its tag and target, rather than turning junctions into symbolic links requiring a different privilege. Store/workspace target contents are outside this module's cleanup scope.

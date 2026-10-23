@@ -1,5 +1,50 @@
 # Validation — 2026-09-07
 
+## 2026-10-17: Sensitive Codex settings opt-in
+
+- PASS: `pnpm check`, 47 frontend tests, `pnpm exec eslint src`, `pnpm build`, changed-Rust rustfmt check and `git diff --check`.
+- PASS: 14 migration tests (13 in the initial focused run plus the existing junction test rerun successfully outside the sandbox), 1 real-archive opt-in ignored; 4 command tests passed. The new fixture covers default exclusion, opt-in estimates/selection, credential/runtime exclusion and exact-byte replacement of an empty destination AGENTS.md using four synthetic settings files. Initial test compilation needed an explicit sum type; the corrected test passed.
+- PASS: optimized Windows Tauri `build --no-bundle`; separate portable EXE `release/portable/dev-companion-sensitive-settings-20261017.exe` (16,913,408 bytes; SHA-256 `BFF54FA5D854193911008FC103971FA7733744C932ACC3078EDEBC7879993A11`). Copy hash matches the build. Existing portable EXEs preserved. Final focused frontend rerun: 9/9; source ESLint passed again.
+- FAIL (existing generated artifacts): full `pnpm lint` reports 105 errors under release validation scripts/WebView data. Source-only ESLint passed. Initial junction test was blocked by sandbox `Access is denied`; an authorized isolated-fixture rerun passed.
+- NOT RUN: live-profile backup/restore, packaged UI interaction, installer, full Rust library suite. No live authentication files were accessed. ZIPs remain unencrypted; the opt-in covers selected settings, not Codex authentication or runtime data.
+
+## 2026-10-14: Codex environment CLI and alias repair
+
+- PASS: TypeScript, scoped ESLint for the environment page/fixtures, bridge/DTOs and translations, 43 frontend tests, frontend production build and `git diff --check`.
+- PASS: full Rust library suite: 122 passed, 0 failed, 3 opt-in tests ignored. Environment fixtures cover npm shell-shim exclusion, PATH/PATHEXT precedence, version-probe failure, real CMD execution with spaces and ampersands, child CODEX_HOME, argument/exit forwarding, working alias, shadowed alias and changed launcher rejection.
+- PASS: explicit installed CLI `--version` smoke in isolated temporary CODEX_HOME: resolved `C:\nvm4w\nodejs\codex.cmd`, returned `codex-cli 0.162.1`. No registry write, credential-file access or authentication action was invoked.
+- PASS: independent source review; partial-save refresh and executable suffix precedence findings resolved. Optimized Tauri Windows build (`pnpm tauri build --no-bundle`) completed. Separate test EXE: `release/portable/dev-companion-codex-environments-20261014.exe`; existing portable EXEs preserved.
+- NOT RUN: live User PATH mutation/Explorer propagation, real login/logout, packaged UI clicks, installer. Initial sandbox pnpm EPERM and Rust OUT_DIR restrictions were resolved by authorized unsandboxed validation.
+
+## 2026-10-14: Modernizr dependency selection fix
+
+- Cause confirmed with live filenames/metadata: ___resources___/modernizr/node_modules contained .cache plus fast-glob/out and @nodelib/fs.scandir/out, fs.stat/out, fs.walk/out. Those generated dependency directories were incorrectly classified as protected project output.
+- Fix: output/cache names are eligible inside already recognized generated candidates. Project discovery/root pruning remains unchanged; sensitive content and links still block selection, now with the exact relative path in the reason.
+- PASS: complete Rust library suite, 120 passed / 0 failed / 2 opt-in ignored. Regression fixtures allow selected dependency output/cache removal, preserve sibling project out/node_modules, and continue blocking nested environment/database/backup content. Independent focused review found no blocker.
+- PASS: explicit native scan only against D:/projects/cus-svn: incomplete=false, skipped=77, ___resources___/modernizr/node_modules files=17687, bytes=77933944, blocked=None. No preview/execute/delete was invoked against the real source. The Modernizr subfolder scan also passed independently.
+- PASS: frontend production build and optimized Windows x64 native build. Fixed artifact: release/portable/dev-companion-project-cleanup-fix-20261014.exe, SHA-256 9BED41B2C5E82776E8BDB87E7F9EFF43F1F0908CF3D446D4AE6AC29A93FB5D1C. Existing EXEs preserved.
+- NOT RUN: live project deletion or packaged-app clicks. No live user project files were removed.
+
+## 2026-10-14: Project Cleanup
+
+- PASS: TypeScript, source lint (`pnpm exec eslint src`), 41 frontend tests, frontend production build and `git diff --check`.
+- PASS: full Rust library suite: 118 passed, 0 failed, 1 opt-in migration test ignored. Ten Project Cleanup tests cover selection/protected source and lockfiles, changed/new files or markers before mutation, Python source-bound bytecode, IDs/tokens/unsafe roots, queued cancellation, protected/nested managed trees, .next deployment preservation, bounded candidate enumeration, truthful partial deletion and a real Windows junction/outside sentinel.
+- PASS: independent focused review resolved managed-root traversal, protected nested data, unbounded enqueue, partial reporting and cancellation publication issues; no remaining blocker reported.
+- PASS (synthetic browser fixture only): production ProjectCleanupPage + shared styles, choose/scan, initially empty selection, eligible-only Select all, blocked pnpm-style row, Preview, wrong confirmation disabled, exact confirmation enabled, selection change invalidates preview/confirmation, and mock execute receives only preview token plus confirmation. Fixture invoke does not touch filesystem. Screenshot saved in the chat visualization directory.
+- PASS: optimized Windows x64 separate portable test executable: release/portable/dev-companion-project-cleanup-20261014.exe, SHA-256 4C60C7F81693D6CFF8BE06460C3659599C09106A3E5B88AC70CA888AB1F9D006. Includes Codex Cleanup navigation/inventory changes. Existing canonical portable EXE and running Dropbox copy preserved.
+- NOT RUN: native picker, Explorer, live-project deletion, packaged-app click/scan/delete interaction, NSIS and second-machine behavior. No live project or Codex data was deleted. Previous native launch validation timed out on app approval; not retried for this task.
+- Full-repository lint remains affected by ignored release validation artifacts; source lint passes. Scan limits are 100,000 entries / 20,000 directories / 64 levels / 2,048 candidates; incomplete scans cannot authorize deletion. Hash checks cover files up to 4 MiB and required project/source markers; larger generated files use size/mtime snapshots. This uses the existing trusted-local-folder boundary, not protection against a hostile process racing filesystem checks.
+
+## 2026-10-14: Codex cleanup navigation / size inventory
+
+- PASS: TypeScript check, source lint (`pnpm exec eslint src`), all 39 frontend tests, frontend production build, and three focused Rust cleanup tests.
+- PASS: read-only inventory fixture preserves synthetic chat/auth/plugin files, limits traversal, reports partial sizes, and skips a real Windows junction. Existing unknown/changed/outside-file cleanup tests still pass.
+- PASS: independent review found no deletion-safety blocker. Root files / omitted entries are explicitly distinguished when traversal is partial.
+- PASS: optimized Windows x64 EXE built using Tauri `build --no-bundle`; separate `release/portable/dev-companion-cleanup-20261014.exe`. Canonical portable EXE and running Dropbox copy preserved.
+- FAIL (existing artifact scope): `pnpm lint` reports 104 errors in ignored `release/source-tree-ui-check` and `release/xampp-ui-validation` artifacts. Source lint passes; no unrelated cleanup performed.
+- NOT RUN: native EXE menu/scan/cleanup interaction. Computer Use launch timed out waiting for app approval. No live Codex files were deleted, no processes were stopped, and no NSIS build/installation or second-machine validation was performed.
+- Live metadata-only profile inventory: sessions ~589 MiB, installed plugins ~519 MiB, sandbox binaries ~327 MiB, temporary staging ~145 MiB (including a ~76 MiB plugin checkout). Only the verified remote catalog remains eligible; age and temporary-directory names alone do not prove these checkouts are unused. Counts can change while Codex runs.
+
 ## Diagnostic writer isolation — 2026-10-06
 
 - User confirms the raw path-trace log ends mid-JSON, with the true callback
@@ -378,3 +423,33 @@ To repeat the optional real-archive check without touching the live profile:
 $env:DEV_COMPANION_VALIDATION_ZIP = '<path to a Codex migration ZIP>'
 cargo test --manifest-path src-tauri/Cargo.toml --lib codex_migration::tests::real_archive_overwrites_fresh_install_and_verifies_every_file -- --ignored --nocapture --test-threads=1
 ```
+
+## 2026-10-14 — Project Cleanup recycle choice and archive button
+
+- PASS: local TypeScript type-check, source ESLint, all 46 frontend tests (including mode/default IPC and retained-output handoff), full Rust library suite (132 passed, 0 failed, 5 ignored), focused Project Cleanup tests (22 passed, 0 failed, 3 ignored), and scoped independent review.
+- PASS: actual Windows Recycle Bin opt-in tests using only uniquely named owned fixtures under src-tauri/target: one cache file and one directory with two nested tiny files. Shell confirmed a Recycle Bin item, source/stage paths disappeared, and the tiny fixture items remain in the bin. No global bin cleanup or live project deletion occurred.
+- PASS: synthetic browser interaction with production ProjectCleanupPage/CompressionPage: default recycle; selecting candidates; changing mode invalidates preview and typed confirmation; both mode-specific confirmations execute with the preview token; result archive action loads the completed Unicode source; pending readiness disables source changes; Everything filters retain dist/package.json; archive still requires explicit preview/start. No filesystem operation or 7-Zip creation was performed in the browser fixture.
+- PASS: deterministic staging recovery tests for null/full-delete restoration, partial source retention, replacement collision, source disappearance during validation, confirmed recycling with stage-cleanup warning and truthful counters, and recovery-stage scan/root/candidate guards.
+- NOT RUN: interactive Explorer restore, real user-project cleanup/archival, packaged-app interactions, NSIS installation, unsupported-volume/no-space Windows recovery behavior. Stop builds/watchers before cleanup; recycle requires verifiable same-volume hardlinks and does not free disk space until the bin is emptied.
+
+- PASS: optimized `tauri build --no-bundle` (fresh frontend production build), final `git diff --check`.
+- New separate portable artifact: `release/portable/dev-companion-cleanup-recycle-archive-20261014.exe` (16,864,768 bytes), SHA-256 `9E34FFC3E150B970AE2433371D72985ED2D891A83C6067DDF109D7C8E8DF50E5`. Canonical portable EXE was not overwritten; no commit/push.
+
+## 2026-10-14 — pnpm linked node_modules cleanup
+
+- PASS: TypeScript check, source-only ESLint, 46 frontend tests; full Rust library suite 135 passed / 0 failed / 6 ignored; focused Project Cleanup 25 passed / 0 failed / 4 ignored; scoped independent review and git diff whitespace check.
+- PASS: explicit read-only scan of D:/projects/cus-gitlab/shinshin: incomplete=false, node_modules files=13,714 / bytes=82,051,560 / blocked=None. No real project deletion or installation was performed.
+- PASS: owned permanent fixture with internal junction and external hardlink sentinel preserved; ancestor cycle and external junction rejection; junction retargeted from internal A to B after preview aborts before deleting either target.
+- PASS: actual opt-in Windows Recycle Bin smoke for a tiny owned pnpm-like directory. Raw junction recovery staging succeeded, candidate/staging paths were gone after confirmation, outside hardlink sentinel stayed unchanged. One tiny test directory remains in the bin; no global bin cleanup. No owned fixture/recovery directories remain under target.
+- NOT RUN: interactive Explorer restoration or cleanup/archival of the user's real project in the packaged app; file-symlink privilege behavior on other machines, non-NTFS/unsupported reparse destinations. External/workspace links and linked roots/caches remain blocked. Logical content bytes are displayed without claiming physical disk-space reclamation; shared pnpm store remains out of scope.
+
+- PASS: optimized Tauri no-bundle build with fresh frontend production build. Separate artifact: release/portable/dev-companion-pnpm-cleanup-fix-20261014.exe (16879616 bytes), SHA-256 F2D5392391958BE57DE9D82D4547DB3391F6BAA7062C9998C593CB9835FF926E. Canonical portable EXE preserved; no commit/push.
+
+## 2026-10-14 — Canonical path Recycle Bin fix
+
+- REPRODUCED before fix: owned pnpm fixture passed its canonical verbatim path into Windows Shell and failed with the user's exact E_INVALIDARG (0x80070057), before mutation. Earlier smoke had only passed ordinary paths.
+- PASS after fix: same actual Windows Bin fixture with canonical path, spaces/Vietnamese parent, internal junction and preserved outside hardlink sentinel. No temporary stage/fixture directory remains; one tiny owned test item remains in the bin. No live project was deleted.
+- PASS: full native suite 135 passed / 0 failed / 6 ignored, rustfmt on changed native file. Shell input strips only the verbatim-drive prefix in UTF-16; original canonical paths and safety/recovery checks are unchanged.
+- NOT RUN: deletion/recycling of the user's real project, interactive Explorer restore or packaged-app interaction. No frontend behavior was changed for this fix.
+
+- PASS: optimized Tauri no-bundle build with fresh frontend production build. Separate artifact: release/portable/dev-companion-recycle-shell-fix-20261014.exe (16886272 bytes), SHA-256 73B8C46A00E3F6367ADB0F31F26FCD8E84B050B72D8C12D71B605E74FDDD529F. Canonical portable EXE preserved; no commit/push.

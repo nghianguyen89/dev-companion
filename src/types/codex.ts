@@ -36,6 +36,7 @@ export interface AppConfiguration {
   logLevel: "error" | "warn" | "info" | "debug";
   codexEnvironments: CodexEnvironment[];
   fileTransferProfiles: FileTransferProfile[];
+  compressionProfiles?: CompressionProfile[];
 }
 
 export type FileTransferMode = "simpleCopy" | "fastCopy" | "projectMigration" | "mirror";
@@ -60,7 +61,8 @@ export interface FileTransferHistoryEntry { id: string; startedAt: string; compl
 export interface CompressionReadiness { available: boolean; path: string | null; message: string; running: boolean; }
 export interface CompressionTreeEntry { path: string; isDirectory: boolean; bytes: number; }
 export interface CompressionSourceTree { source: string; defaultOutputFolder: string; entries: CompressionTreeEntry[]; skippedReparsePoints: number; }
-export interface CompressionConfig { source: string; outputFolder: string; mode: "fast" | "strong"; excludedPaths: string[]; regexExclusions: string[]; }
+export interface CompressionConfig { source: string; outputFolder: string; mode: "fast" | "strong"; excludedPaths: string[]; regexExclusions: string[]; excludedDirectoryNames?: string[]; excludedFileExtensions?: string[]; includedPaths?: string[]; }
+export interface CompressionProfile { id: string; name: string; config: CompressionConfig; }
 export interface CompressionCommandPreview { command: string; archivePath: string; includedFiles: number; includedFolders: number; skippedReparsePoints: number; }
 export interface CompressionOutput { line: string; stream: "stdout" | "stderr"; }
 export interface CompressionProgress { percent: number; }
@@ -84,7 +86,7 @@ export interface CodexEnvironmentInput {
   codexHome: string;
   description?: string;
 }
-export interface CodexCliStatus { installed: boolean; path: string | null; version: string | null; }
+export interface CodexCliStatus { installed: boolean; path: string | null; version: string | null; error: string | null; }
 export interface CodexEnvironmentStatus extends CodexEnvironment {
   isDefault: boolean;
   codexHomeExists: boolean;
@@ -169,3 +171,9 @@ export interface XamppReadiness { supported: boolean; installationFound: boolean
 export interface XamppPreview { token: string; sourceAppVersion: string; architecture: string; projects: string[]; configFiles: string[]; fileCount: number; bytes: number; excludedCount: number; sensitive: boolean; }
 export interface XamppInspection { token: string; bundleName: string; createdAt: string; sourceAppVersion: string; architecture: string; projects: string[]; fileCount: number; bytes: number; sensitive: boolean; }
 export interface XamppRecoveryPreview { token: string; stagingPath: string; destinationConflicts: number; manualOnly: boolean; }
+
+export interface ProjectCleanupCandidate { id: string; path: string; kind: "nodeDependencies" | "nodeCache" | "pythonCache"; files: number; bytes: number; blocked: string | null }
+export interface ProjectCleanupScan { token: string; root: string; candidates: ProjectCleanupCandidate[]; skipped: number; incomplete: boolean }
+export type ProjectCleanupMode = "permanent" | "recycle";
+export interface ProjectCleanupPreview { mode: ProjectCleanupMode; token: string; root: string; candidates: ProjectCleanupCandidate[]; files: number; bytes: number }
+export interface ProjectCleanupOutcome { mode: ProjectCleanupMode; recycledFiles: number; recycledDirectories: number; recycledBytes: number; deletedFiles: number; removedDirectories: number; reclaimedBytes: number; errors: string[] }

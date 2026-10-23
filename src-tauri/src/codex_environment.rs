@@ -46,6 +46,7 @@ pub struct CliStatus {
     pub installed: bool,
     pub path: Option<String>,
     pub version: Option<String>,
+    pub error: Option<String>,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -142,7 +143,8 @@ fn normal(path: &Path) -> String {
 }
 fn validate_alias(value: &str) -> Result<(), String> {
     let bytes = value.as_bytes();
-    if value.len() < 3
+    if value.eq_ignore_ascii_case("codex")
+        || value.len() < 3
         || value.len() > 64
         || !bytes.first().is_some_and(u8::is_ascii_alphabetic)
         || !bytes
@@ -190,43 +192,118 @@ fn default_environment() -> Result<Environment, String> {
     })
 }
 
-fn cli_status() -> CliStatus {
+fn effective_path() -> String {
+    let mut value = String::new();
     #[cfg(windows)]
-    let path = background_command("where.exe")
-        .arg("codex")
+    for scope in ["Machine", "User"] {
+        if let Ok(saved) = registry_path(scope) {
+            if !saved.is_empty() {
+                value.push(';');
+                value.push_str(&expand_user_path(&saved));
+            }
+        }
+    }
+    value.push(';');
+    value.push_str(&env::var("PATH").unwrap_or_default());
+    value
+}
+
+fn resolve_command(alias: &str, path: &str) -> Option<PathBuf> {
+    let extensions = env::var("PATHEXT").unwrap_or_else(|_| ".COM;.EXE;.BAT;.CMD".into());
+    path.split(';')
+        .map(|part| PathBuf::from(expand_user_path(part.trim().trim_matches('"'))))
+        .filter(|directory| directory.is_absolute())
+        .flat_map(|directory| {
+            extensions
+                .split(';')
+                .filter(|extension| {
+                    [".exe", ".cmd", ".bat", ".com"]
+                        .iter()
+                        .any(|supported| extension.eq_ignore_ascii_case(supported))
+                })
+                .map(move |extension| {
+                    directory.join(format!("{alias}{}", extension.to_ascii_lowercase()))
+                })
+        })
+        .find(|candidate| candidate.is_file())
+}
+
+fn batch_value(value: &str) -> Result<(), String> {
+    if value.contains(['"', '%', '!', '\r', '\n', '\0']) {
+        return Err("Launcher paths cannot contain quotes, %, !, or control characters.".into());
+    }
+    Ok(())
+}
+
+fn cli_command(path: &Path, args: &[&str]) -> Result<Command, String> {
+    #[cfg(windows)]
+    if path.extension().is_some_and(|extension| {
+        extension.eq_ignore_ascii_case("cmd") || extension.eq_ignore_ascii_case("bat")
+    }) {
+        use std::os::windows::process::CommandExt;
+        batch_value(&display(path))?;
+        let mut command = background_command("cmd.exe");
+        // Pass the path through the environment so CMD receives one quoted batch target.
+        command.env("DEV_COMPANION_CODEX_CLI", path);
+        command.raw_arg(format!(
+            "/d /v:off /s /c \"\"%DEV_COMPANION_CODEX_CLI%\" {}\"",
+            args.join(" ")
+        ));
+        return Ok(command);
+    }
+    let mut command = background_command(path);
+    command.args(args);
+    Ok(command)
+}
+
+fn probe_version(path: &Path, search_path: &str, home: Option<&Path>) -> Result<String, String> {
+    let mut command = cli_command(path, &["--version"])?;
+    command.env("PATH", search_path);
+    if let Some(home) = home {
+        command.env("CODEX_HOME", home);
+    }
+    let output = command
         .output()
-        .ok()
-        .filter(|out| out.status.success())
-        .and_then(|out| String::from_utf8(out.stdout).ok())
-        .and_then(|out| {
-            out.lines()
-                .next()
-                .map(str::trim)
-                .filter(|line| !line.is_empty())
-                .map(str::to_owned)
-        });
-    #[cfg(not(windows))]
-    let path = None;
-    let version = background_command("codex")
-        .arg("--version")
-        .output()
-        .ok()
-        .filter(|out| out.status.success())
-        .and_then(|out| String::from_utf8(out.stdout).ok())
-        .map(|out| out.trim().to_owned())
-        .filter(|value| !value.is_empty());
+        .map_err(|_| "Could not execute Codex CLI. Check Node.js and the CLI installation.")?;
+    let version = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    if !output.status.success() || !version.starts_with("codex-cli ") {
+        return Err(
+            "Codex CLI was found but --version failed. Check Node.js and the CLI installation."
+                .into(),
+        );
+    }
+    Ok(version)
+}
+
+fn cli_status(search_path: &str) -> CliStatus {
+    let path = resolve_command("codex", search_path);
+    let result = path
+        .as_deref()
+        .map(|path| probe_version(path, search_path, None));
+    let (version, error) = match result {
+        Some(Ok(version)) => (Some(version), None),
+        Some(Err(error)) => (None, Some(error)),
+        None => (None, None),
+    };
     CliStatus {
-        installed: version.is_some(),
-        path,
+        installed: path.is_some(),
+        path: path.as_deref().map(display),
         version,
+        error,
     }
 }
-fn login_status(home: &Path, installed: bool) -> String {
-    if !installed {
+fn login_status(home: &Path, cli: &CliStatus, search_path: &str) -> String {
+    if cli.version.is_none() {
         return "unknown".into();
     }
-    match background_command("codex")
-        .args(["login", "status"])
+    let Ok(mut command) = cli_command(
+        Path::new(cli.path.as_deref().unwrap()),
+        &["login", "status"],
+    ) else {
+        return "unknown".into();
+    };
+    match command
+        .env("PATH", search_path)
         .env("CODEX_HOME", home)
         .output()
     {
@@ -244,27 +321,33 @@ fn login_status(home: &Path, installed: bool) -> String {
         _ => "unknown".into(),
     }
 }
-fn status(environment: Environment, is_default: bool, installed: bool) -> EnvironmentStatus {
+fn status(
+    environment: Environment,
+    is_default: bool,
+    cli: &CliStatus,
+    search_path: &str,
+) -> EnvironmentStatus {
     let home = PathBuf::from(&environment.codex_home);
     EnvironmentStatus {
         codex_home_exists: home.is_dir(),
         agents_exists: home.join("AGENTS.md").is_file(),
-        login_status: login_status(&home, installed),
+        login_status: login_status(&home, cli, search_path),
         environment,
         is_default,
     }
 }
 
 pub fn overview(configuration: &AppConfiguration) -> Result<Overview, String> {
-    let cli = cli_status();
+    let search_path = effective_path();
+    let cli = cli_status(&search_path);
     let default = default_environment()?;
-    let mut environments = vec![status(default.clone(), true, cli.installed)];
+    let mut environments = vec![status(default.clone(), true, &cli, &search_path)];
     environments.extend(
         configuration
             .codex_environments
             .iter()
             .cloned()
-            .map(|environment| status(environment, false, cli.installed)),
+            .map(|environment| status(environment, false, &cli, &search_path)),
     );
     let directory = launcher_dir()?;
     let user_path = user_path().unwrap_or_default();
@@ -387,18 +470,30 @@ fn environment(id: &str) -> Result<Environment, String> {
     }
 }
 
-fn launcher_content(home: &str, alias: &str) -> String {
-    format!("@echo off\r\nsetlocal\r\n\r\nset \"CODEX_HOME={home}\"\r\n\r\nif not exist \"%CODEX_HOME%\" (\r\n    mkdir \"%CODEX_HOME%\" >nul 2>&1\r\n)\r\n\r\nwhere codex >nul 2>&1\r\nif errorlevel 1 (\r\n    echo [{alias}] ERROR: \"codex\" was not found in PATH.\r\n    endlocal\r\n    exit /b 1\r\n)\r\n\r\ncall codex %*\r\nset \"EXIT_CODE=%ERRORLEVEL%\"\r\n\r\nendlocal & exit /b %EXIT_CODE%\r\n")
+fn launcher_content(home: &str, cli: &str) -> Result<String, String> {
+    batch_value(home)?;
+    batch_value(cli)?;
+    let directory = Path::new(cli).parent().ok_or("Invalid Codex CLI path.")?;
+    Ok(format!("@echo off\r\nsetlocal DisableDelayedExpansion\r\nset \"CODEX_HOME={home}\"\r\nset \"PATH={};%PATH%\"\r\ncall \"{cli}\" %*\r\nset \"EXIT_CODE=%ERRORLEVEL%\"\r\nendlocal & exit /b %EXIT_CODE%\r\n", display(directory)))
 }
 pub fn regenerate_launcher(id: &str) -> Result<ActionResult, String> {
     let (mut configuration, index) = configured(id)?;
     let environment = configuration.codex_environments[index].clone();
+    validate_alias(&environment.command_alias)?;
+    let cli = cli_status(&effective_path());
+    let cli_path = cli
+        .path
+        .as_deref()
+        .ok_or("Codex CLI was not found in PATH. Install it before creating a launcher.")?;
+    if let Some(error) = cli.error {
+        return Err(error);
+    }
+    let content = launcher_content(&environment.codex_home, cli_path)?;
     let directory = launcher_dir()?;
     fs_safety::check(&directory)?;
     fs::create_dir_all(&directory).map_err(|_| "Could not create the launcher directory.")?;
     let path = directory.join(format!("{}.cmd", environment.command_alias));
     fs_safety::check(&path)?;
-    let content = launcher_content(&environment.codex_home, &environment.command_alias);
     if path.exists()
         && environment.launcher_path.as_deref() != Some(&display(&path))
         && fs::read_to_string(&path).ok().as_deref() != Some(&content)
@@ -409,8 +504,14 @@ pub fn regenerate_launcher(id: &str) -> Result<ActionResult, String> {
     configuration.codex_environments[index].launcher_path = Some(display(&path));
     configuration.codex_environments[index].updated_at = now()?;
     config::save(&configuration).map_err(|error| error.to_string())?;
+    let path_result = add_launcher_dir_to_user_path()
+        .map_err(|error| format!("Launcher created, but PATH setup failed: {error}"))?;
     Ok(ActionResult {
-        message: format!("Launcher created: {}", display(&path)),
+        message: format!(
+            "Launcher created: {}. {} Restart terminals opened before this change.",
+            display(&path),
+            path_result.message
+        ),
     })
 }
 pub fn remove_launcher(id: &str, confirmation: &str) -> Result<ActionResult, String> {
@@ -450,40 +551,54 @@ pub fn remove_launcher(id: &str, confirmation: &str) -> Result<ActionResult, Str
 fn user_path() -> Result<String, String> {
     #[cfg(windows)]
     {
-        let output = Command::new("reg.exe")
-            .args(["query", "HKCU\\Environment", "/v", "Path"])
-            .output()
-            .map_err(|_| "Could not read the User PATH.")?;
-        if !output.status.success() {
-            return Ok(String::new());
-        }
-        let rendered = String::from_utf8_lossy(&output.stdout);
-        let line = rendered
-            .lines()
-            .find(|line| line.contains("REG_"))
-            .unwrap_or("");
-        let type_at = line.find("REG_").ok_or("Could not parse the User PATH.")?;
-        let data_at = line[type_at..]
-            .find(char::is_whitespace)
-            .ok_or("Could not parse the User PATH.")?
-            + type_at;
-        Ok(line[data_at..].trim().to_owned())
+        registry_path("User")
     }
     #[cfg(not(windows))]
     {
         Ok(env::var("PATH").unwrap_or_default())
     }
 }
+#[cfg(windows)]
+fn registry_path(scope: &str) -> Result<String, String> {
+    let script = format!("$ErrorActionPreference='Stop'; [Console]::OutputEncoding=[Text.UTF8Encoding]::new(); [Environment]::GetEnvironmentVariable('Path','{scope}')");
+    let output = background_command("powershell.exe")
+        .args([
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            &script,
+        ])
+        .output()
+        .map_err(|_| "Could not read the saved PATH.")?;
+    if !output.status.success() {
+        return Err("Could not read the saved PATH; no PATH changes were made.".into());
+    }
+    String::from_utf8(output.stdout)
+        .map(|value| value.trim().to_owned())
+        .map_err(|_| "Could not decode the saved PATH.".into())
+}
 fn expand_user_path(value: &str) -> String {
-    value
-        .replace(
-            "%USERPROFILE%",
-            &env::var("USERPROFILE").unwrap_or_default(),
-        )
-        .replace(
-            "%userprofile%",
-            &env::var("USERPROFILE").unwrap_or_default(),
-        )
+    let mut expanded = String::new();
+    let mut remaining = value;
+    while let Some(start) = remaining.find('%') {
+        expanded.push_str(&remaining[..start]);
+        let Some(end) = remaining[start + 1..].find('%') else {
+            expanded.push_str(&remaining[start..]);
+            return expanded;
+        };
+        let end = start + 1 + end;
+        let name = &remaining[start + 1..end];
+        expanded.push_str(
+            &env::vars()
+                .find(|(key, _)| key.eq_ignore_ascii_case(name))
+                .map(|(_, value)| value)
+                .unwrap_or_else(|| remaining[start..=end].into()),
+        );
+        remaining = &remaining[end + 1..];
+    }
+    expanded.push_str(remaining);
+    expanded
 }
 fn path_contains(value: &str, directory: &Path) -> bool {
     let expected = normal(directory);
@@ -498,6 +613,7 @@ fn path_contains(value: &str, directory: &Path) -> bool {
 }
 pub fn add_launcher_dir_to_user_path() -> Result<ActionResult, String> {
     let directory = launcher_dir()?;
+    fs_safety::check(&directory)?;
     fs::create_dir_all(&directory).map_err(|_| "Could not create the launcher directory.")?;
     let current = user_path()?;
     if path_contains(&current, &directory) {
@@ -512,7 +628,7 @@ pub fn add_launcher_dir_to_user_path() -> Result<ActionResult, String> {
         } else {
             format!("{};{}", current.trim_end_matches(';'), display(&directory))
         };
-        let status = Command::new("reg.exe")
+        let status = background_command("reg.exe")
             .args([
                 "add",
                 "HKCU\\Environment",
@@ -529,6 +645,31 @@ pub fn add_launcher_dir_to_user_path() -> Result<ActionResult, String> {
         if !status.success() {
             return Err("Could not update the User PATH.".into());
         }
+        // Notify Explorer so newly opened terminals inherit the saved User PATH.
+        #[link(name = "user32")]
+        extern "system" {
+            fn SendMessageTimeoutW(
+                hwnd: isize,
+                msg: u32,
+                wparam: usize,
+                lparam: isize,
+                flags: u32,
+                timeout: u32,
+                result: *mut usize,
+            ) -> isize;
+        }
+        let setting: Vec<u16> = "Environment\0".encode_utf16().collect();
+        unsafe {
+            SendMessageTimeoutW(
+                0xffff,
+                0x001a,
+                0,
+                setting.as_ptr() as isize,
+                2,
+                1000,
+                std::ptr::null_mut(),
+            );
+        }
         Ok(ActionResult {
             message: "Added the launcher directory to the User PATH. Restart terminals to use it."
                 .into(),
@@ -539,6 +680,51 @@ pub fn add_launcher_dir_to_user_path() -> Result<ActionResult, String> {
         let _ = current;
         Err("Updating PATH is supported on Windows only.".into())
     }
+}
+
+pub fn check_alias(id: &str) -> Result<ActionResult, String> {
+    let environment = environment(id)?;
+    check_environment_alias(&environment, &effective_path(), &launcher_dir()?)
+}
+
+fn check_environment_alias(
+    environment: &Environment,
+    search_path: &str,
+    directory: &Path,
+) -> Result<ActionResult, String> {
+    if !environment.id.eq("default") {
+        validate_alias(&environment.command_alias)?;
+    }
+    let resolved = resolve_command(&environment.command_alias, search_path).ok_or(
+        "Alias was not found in PATH. Regenerate the launcher, then restart existing terminals.",
+    )?;
+    if !environment.id.eq("default") {
+        let expected = directory.join(format!("{}.cmd", environment.command_alias));
+        if normal(&resolved) != normal(&expected) {
+            return Err(
+                "Another command shadows this alias in PATH. Choose a different alias.".into(),
+            );
+        }
+        fs_safety::check(&resolved)?;
+        let cli = cli_status(search_path);
+        let content = launcher_content(
+            &environment.codex_home,
+            cli.path
+                .as_deref()
+                .ok_or("Codex CLI was not found in PATH.")?,
+        )?;
+        if fs::read_to_string(&resolved).ok().as_deref() != Some(&content) {
+            return Err(
+                "Launcher is outdated or changed. Regenerate it before checking the alias.".into(),
+            );
+        }
+    }
+    let version = probe_version(
+        &resolved,
+        search_path,
+        Some(Path::new(&environment.codex_home)),
+    )?;
+    Ok(ActionResult { message: format!("Alias {} works: {version}. Checked using updated PATH; restart terminals opened before PATH changes.", environment.command_alias) })
 }
 
 pub fn instructions(id: &str) -> Result<Instructions, String> {
@@ -705,8 +891,14 @@ pub fn open_agents(id: &str) -> Result<ActionResult, String> {
 }
 pub fn run_cli(id: &str, action: &str) -> Result<ActionResult, String> {
     let environment = environment(id)?;
-    if !cli_status().installed {
-        return Err("Codex CLI was not found in PATH.".into());
+    let search_path = effective_path();
+    let cli = cli_status(&search_path);
+    let path = cli
+        .path
+        .as_deref()
+        .ok_or("Codex CLI was not found in PATH.")?;
+    if let Some(error) = cli.error {
+        return Err(error);
     }
     let args: &[&str] = match action {
         "launch" => &[],
@@ -714,9 +906,9 @@ pub fn run_cli(id: &str, action: &str) -> Result<ActionResult, String> {
         "logout" => &["logout"],
         _ => return Err("Unsupported Codex action.".into()),
     };
-    let mut command = Command::new("codex");
+    let mut command = cli_command(Path::new(path), args)?;
     command
-        .args(args)
+        .env("PATH", &search_path)
         .env("CODEX_HOME", &environment.codex_home);
     #[cfg(windows)]
     {
@@ -733,15 +925,145 @@ pub fn run_cli(id: &str, action: &str) -> Result<ActionResult, String> {
 mod tests {
     use super::*;
     #[test]
+    fn resolver_skips_extensionless_shell_shims_and_obeys_path_order() {
+        let root = env::temp_dir().join(format!(
+            "companion-resolver-{}",
+            OffsetDateTime::now_utc().unix_timestamp_nanos()
+        ));
+        let first = root.join("first");
+        let second = root.join("second");
+        fs::create_dir_all(&first).unwrap();
+        fs::create_dir_all(&second).unwrap();
+        fs::write(first.join("codex"), "#!/bin/sh").unwrap();
+        fs::write(first.join("codex.cmd"), "@echo off").unwrap();
+        fs::write(second.join("codex.exe"), "fixture").unwrap();
+        assert_eq!(
+            resolve_command(
+                "codex",
+                &format!("{};{}", display(&first), display(&second))
+            ),
+            Some(first.join("codex.cmd"))
+        );
+        fs::remove_file(first.join("codex.cmd")).unwrap();
+        assert_eq!(resolve_command("codex", &display(&first)), None);
+        fs::write(first.join("codex.cmd"), "fixture").unwrap();
+        fs::write(first.join("codex.bat"), "shadow").unwrap();
+        assert_eq!(
+            resolve_command("codex", &display(&first)),
+            Some(first.join("codex.bat"))
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn batch_probe_and_launcher_run_in_paths_with_spaces_and_forward_home_args_and_exit() {
+        let root = env::temp_dir().join(format!(
+            "companion batch & probe {}",
+            OffsetDateTime::now_utc().unix_timestamp_nanos()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let cli = root.join("codex.cmd");
+        let home = root.join(".codex-fixture");
+        fs::write(&cli, "@echo off\r\nif \"%~1\"==\"--version\" (echo codex-cli fixture& exit /b 0)\r\necho \"%CODEX_HOME%\"\r\necho %~1\r\nexit /b 7\r\n").unwrap();
+        let path = env::var("PATH").unwrap_or_default();
+        assert_eq!(
+            probe_version(&cli, &path, Some(&home)).unwrap(),
+            "codex-cli fixture"
+        );
+        let launcher = root.join("codex-fixture.cmd");
+        fs::write(
+            &launcher,
+            launcher_content(&display(&home), &display(&cli)).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            probe_version(&launcher, &path, None).unwrap(),
+            "codex-cli fixture"
+        );
+        let environment = Environment {
+            id: "fixture".into(),
+            display_name: "Fixture".into(),
+            command_alias: "codex-fixture".into(),
+            codex_home: display(&home),
+            description: None,
+            manages_instructions: false,
+            launcher_path: Some(display(&launcher)),
+            created_at: String::new(),
+            updated_at: String::new(),
+        };
+        let search_path = format!("{};{path}", display(&root));
+        assert!(check_environment_alias(&environment, &search_path, &root)
+            .unwrap()
+            .message
+            .contains("works"));
+        let shadow = root.join("codex-fixture.bat");
+        fs::write(&shadow, "@echo off\r\nexit /b 0\r\n").unwrap();
+        assert!(check_environment_alias(&environment, &search_path, &root)
+            .err()
+            .unwrap()
+            .contains("shadows"));
+        fs::remove_file(shadow).unwrap();
+        fs::write(&launcher, "@echo off\r\nexit /b 0\r\n").unwrap();
+        assert!(check_environment_alias(&environment, &search_path, &root)
+            .err()
+            .unwrap()
+            .contains("outdated"));
+        fs::write(
+            &launcher,
+            launcher_content(&display(&home), &display(&cli)).unwrap(),
+        )
+        .unwrap();
+        let output = cli_command(&launcher, &["hello"])
+            .unwrap()
+            .env("PATH", &path)
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(7));
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(stdout.contains(&display(&home)));
+        assert!(stdout.contains("hello"));
+        fs::write(&cli, "@echo off\r\nexit /b 1\r\n").unwrap();
+        let status = cli_status(&display(&root));
+        assert!(status.installed);
+        assert!(status.version.is_none());
+        assert!(status.error.is_some());
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
     fn validates_command_aliases() {
         assert!(validate_alias("codex-cus").is_ok());
         assert!(validate_alias("-bad").is_err());
         assert!(validate_alias("bad.cmd").is_err());
+        assert!(validate_alias("CODEX").is_err());
+    }
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "Opt-in installed CLI smoke; --version only, isolated CODEX_HOME, no registry writes"]
+    fn installed_cli_version_probe_smoke() {
+        let root = env::temp_dir().join(format!(
+            "companion-cli-smoke-{}",
+            OffsetDateTime::now_utc().unix_timestamp_nanos()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let search_path = effective_path();
+        let path = resolve_command("codex", &search_path)
+            .expect("Codex CLI must be installed for this smoke test");
+        let version = probe_version(&path, &search_path, Some(&root)).unwrap();
+        assert!(version.starts_with("codex-cli "));
+        println!("Resolved {}: {version}", display(&path));
+        fs::remove_dir_all(root).unwrap();
     }
     #[test]
     fn launcher_forwards_arguments_and_exit_code() {
-        let script = launcher_content("C:\\Users\\A\\.codex-cus", "codex-cus");
-        assert!(script.contains("call codex %*"));
+        let script = launcher_content(
+            "C:\\Users\\A\\.codex-cus",
+            "C:\\Program Files\\nodejs\\codex.cmd",
+        )
+        .unwrap();
+        assert!(script.contains("call \"C:\\Program Files\\nodejs\\codex.cmd\" %*"));
+        assert!(script.contains("set \"PATH=C:\\Program Files\\nodejs;%PATH%\""));
+        assert!(launcher_content("C:\\%TEMP%\\home", "C:\\codex.cmd").is_err());
         assert!(script.contains("endlocal & exit /b %EXIT_CODE%"));
     }
     #[test]

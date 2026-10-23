@@ -10,6 +10,10 @@ it("renders the multi-account migration choices and a guarded restore", () => {
   expect(html).toContain("Additional local Codex state");
   expect(html).toContain("Worktrees with uncommitted code");
   expect(html).toContain("Estimated backup input");
+  expect(html).toContain("Move sensitive content too");
+  expect(html).toContain("The ZIP is not encrypted");
+  expect(html).toContain('aria-describedby="migration-sensitive-help"');
+  expect(html).not.toMatch(/<input[^>]*aria-describedby="migration-sensitive-help"[^>]*checked/);
   expect(html).toContain("Migration backups");
   expect(html).toContain("Migration overwrites backed-up files");
   expect(html).not.toContain("Existing files are kept by default");

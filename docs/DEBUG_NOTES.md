@@ -1,5 +1,10 @@
 # Debug Notes
 
+## 2026-10-17: AGENTS.md omitted from migration
+
+- Settings filtering uses substring matches (`secret`, `password`, etc.). An innocuous `female secretary` sentence matches `secret` and causes the entire AGENTS.md to be omitted; the current global file reproduced this condition. The original migration ZIP was deleted, so that run's exact omission cannot be proven.
+- The migration backup now offers explicit sensitive-settings opt-in. Carry it through overview estimates, the backend snapshot token, create-time inventory and final inventory verification. Restore already accepts these settings paths and verifies copied bytes. Keep authentication files excluded and use synthetic credentials for tests.
+
 ## Quick diagnostics
 
 Run these from the repository root before changing code:
@@ -190,3 +195,19 @@ files into logs, commits, screenshots, or bug reports.
   the current user home was unavailable. All Codex migration and SourceTree
   configuration tests passed in that run. Frontend: check/lint/build and
   32 tests passed. Browser fixtures passed at 847px and 600px.
+
+## 2026-10-14 — Project Cleanup recycle and archive handoff
+
+Windows Shell recycle flags plus PostDeleteItem are insufficient alone: a null newly-created item can only reveal full deletion after it happened. Recycle cleanup first stages same-volume hardlinks, verifies file identity via handles and revalidates the selected snapshot. An absent source is restored on uncertainty; partial/colliding sources leave the complete recovery stage at the reported path. Failed staging validation retains potentially unique content. Recovery prefixes are excluded from later cleanup scans. Recycle byte counters describe transferred content, not freed disk space.
+
+Archive navigation must use the completed preview root, not the current editable input. Start the existing Compression module with Everything filters so retained build/output content stays included, and require ordinary archive preview/start. Disable source changes only while the initial readiness probe is pending; release that guard even when the probe fails.
+
+## 2026-10-14 — pnpm link false positives
+
+The user's shinshin node_modules root and .pnpm tree are regular directories; autoprefixer is a junction into .pnpm. Blanket child-reparse blocking prevents normal pnpm cleanup. The narrow fix snapshots supported internal link objects and unlinks them without dereferencing targets, keeps external/root/cache protections, and clones raw reparse data during recycle staging. Replacing a junction via symlink_dir changes its tag and may require privileges, so it cannot substitute for exact recovery cloning. Logical file sizes do not establish freed physical bytes when shared pnpm hardlinks remain.
+
+## 2026-10-14 — Recycle Shell canonical-path regression
+
+Root scan canonicalizes paths to Windows verbatim form (\\?\...), but SHCreateItemFromParsingName rejects that form with E_INVALIDARG / 0x80070057. Earlier native smoke passed ordinary fixture paths and missed the production boundary. Strip only the leading verbatim prefix from the UTF-16 Shell parsing buffer after local-drive validation; keep canonical paths for all filesystem checks, snapshot/staging and post-operation checks. No lossy path conversion or weakened root/link guard.
+
+The owned pnpm native test now canonicalizes its candidate and uses a parent containing spaces/Vietnamese. Before the fix it reproduced the exact parser error; after the fix it confirmed a Bin move while preserving the outside hardlink sentinel and removing temporary stages. No user project was deleted.

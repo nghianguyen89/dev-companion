@@ -11,8 +11,11 @@ pub async fn get_compression_readiness() -> Result<compression::Readiness, Strin
 }
 
 #[tauri::command]
-pub async fn scan_compression_source(source: String) -> Result<compression::SourceTree, String> {
-    run_blocking(move || compression::scan_source(&source)).await?
+pub async fn scan_compression_source(
+    source: String,
+    folder: Option<String>,
+) -> Result<compression::SourceTree, String> {
+    run_blocking(move || compression::scan_source(&source, folder.as_deref())).await?
 }
 
 #[tauri::command]
@@ -379,6 +382,10 @@ pub async fn regenerate_codex_launcher(
     run_blocking(move || codex_environment::regenerate_launcher(&id)).await?
 }
 #[tauri::command]
+pub async fn check_codex_alias(id: String) -> Result<codex_environment::ActionResult, String> {
+    run_blocking(move || codex_environment::check_alias(&id)).await?
+}
+#[tauri::command]
 pub async fn remove_codex_launcher(
     id: String,
     confirmation: String,
@@ -533,15 +540,22 @@ pub async fn restore_environment(
     run_blocking(move || crate::environment::restore(&token, &confirmation)).await?
 }
 #[tauri::command]
-pub async fn get_codex_migration_overview() -> Result<crate::codex_migration::Overview, String> {
-    run_blocking(crate::codex_migration::overview).await?
+pub async fn get_codex_migration_overview(
+    include_sensitive: Option<bool>,
+) -> Result<crate::codex_migration::Overview, String> {
+    run_blocking(move || crate::codex_migration::overview(include_sensitive.unwrap_or(false)))
+        .await?
 }
 #[tauri::command]
 pub async fn preview_codex_migration(
     account_ids: Vec<String>,
     groups: Vec<String>,
+    include_sensitive: Option<bool>,
 ) -> Result<crate::codex_migration::Preview, String> {
-    run_blocking(move || crate::codex_migration::preview(account_ids, groups)).await?
+    run_blocking(move || {
+        crate::codex_migration::preview(account_ids, groups, include_sensitive.unwrap_or(false))
+    })
+    .await?
 }
 #[tauri::command]
 pub async fn create_codex_migration(
@@ -927,4 +941,48 @@ mod tests {
         assert_eq!(error, "The background operation did not complete.");
         assert_eq!(tauri::async_runtime::block_on(run_blocking(|| 7)), Ok(7));
     }
+}
+
+#[tauri::command]
+pub async fn pick_project_cleanup_folder(
+    app: tauri::AppHandle,
+    title: String,
+) -> Result<Option<String>, String> {
+    run_blocking(move || {
+        Ok(app
+            .dialog()
+            .file()
+            .set_title(title)
+            .blocking_pick_folder()
+            .and_then(|folder| folder.into_path().ok())
+            .map(|path| compression::display_path(&path)))
+    })
+    .await?
+}
+#[tauri::command]
+pub async fn scan_project_cleanup(root: String) -> Result<crate::project_cleanup::Scan, String> {
+    let request = crate::project_cleanup::prepare_scan()?;
+    run_blocking(move || crate::project_cleanup::scan(&request, &root)).await?
+}
+#[tauri::command]
+pub async fn cancel_project_cleanup() -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(crate::project_cleanup::cancel)
+        .await
+        .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+pub async fn preview_project_cleanup(
+    token: String,
+    ids: Vec<String>,
+    mode: Option<crate::project_cleanup::Mode>,
+) -> Result<crate::project_cleanup::Preview, String> {
+    run_blocking(move || crate::project_cleanup::preview(&token, &ids, mode.unwrap_or_default()))
+        .await?
+}
+#[tauri::command]
+pub async fn execute_project_cleanup(
+    token: String,
+    confirmation: String,
+) -> Result<crate::project_cleanup::Outcome, String> {
+    run_blocking(move || crate::project_cleanup::execute(&token, &confirmation)).await?
 }

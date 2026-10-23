@@ -3,7 +3,32 @@ import type { CompressionConfig, FileTransferConfig } from "../types/codex";
 
 const { invoke } = vi.hoisted(() => { vi.stubGlobal("window", { __TAURI_INTERNALS__: {} }); return { invoke: vi.fn() }; });
 vi.mock("@tauri-apps/api/core", () => ({ invoke, Channel: class<T = unknown> { onmessage: (payload: T) => void; constructor(onmessage: (payload: T) => void) { this.onmessage = onmessage; } } }));
-import { deleteFileTransferLog, previewCompression, previewFileTransfer, restoreCodexMigration, startCompression, startFileTransfer } from "./tauri";
+import { checkCodexAlias, deleteFileTransferLog, executeProjectCleanup, getCodexMigrationOverview, previewCodexMigration, previewCompression, previewFileTransfer, previewProjectCleanup, restoreCodexMigration, startCompression, startFileTransfer } from "./tauri";
+
+it("forwards sensitive migration opt-in and defaults it to false", async () => {
+  await getCodexMigrationOverview();
+  expect(invoke).toHaveBeenLastCalledWith("get_codex_migration_overview", { includeSensitive: false });
+  await previewCodexMigration([".codex"], ["settings"]);
+  expect(invoke).toHaveBeenLastCalledWith("preview_codex_migration", { accountIds: [".codex"], groups: ["settings"], includeSensitive: false });
+  await getCodexMigrationOverview(true);
+  expect(invoke).toHaveBeenLastCalledWith("get_codex_migration_overview", { includeSensitive: true });
+  await previewCodexMigration([".codex"], ["settings"], true);
+  expect(invoke).toHaveBeenLastCalledWith("preview_codex_migration", { accountIds: [".codex"], groups: ["settings"], includeSensitive: true });
+});
+
+it("binds cleanup mode at preview and executes only the confirmed token", async () => {
+  await previewProjectCleanup("scan", ["cache"], "recycle");
+  expect(invoke).toHaveBeenLastCalledWith("preview_project_cleanup", { token: "scan", ids: ["cache"], mode: "recycle" });
+  await previewProjectCleanup("legacy", ["cache"]);
+  expect(invoke).toHaveBeenLastCalledWith("preview_project_cleanup", { token: "legacy", ids: ["cache"], mode: "permanent" });
+  await executeProjectCleanup("preview", "RECYCLE GENERATED");
+  expect(invoke).toHaveBeenLastCalledWith("execute_project_cleanup", { token: "preview", confirmation: "RECYCLE GENERATED" });
+});
+
+it("checks only the selected environment alias through the native boundary", async () => {
+  await checkCodexAlias("cus");
+  expect(invoke).toHaveBeenLastCalledWith("check_codex_alias", { id: "cus" });
+});
 
 describe("file transfer IPC", () => {
   it("sends boolean confirmation fields", async () => {

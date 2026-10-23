@@ -15,3 +15,6 @@
 .compression-page progress { width: 100%; }
 .compression-progress { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; }
 @media (max-width: 720px) { .compression-folder { grid-template-columns: 1fr; } }
+
+.compression-tree button { margin-left: auto; flex-shrink: 0; }
+.compression-patterns input, .compression-page .file-transfer-actions input { padding: 8px 9px; border: 1px solid #3b4659; border-radius: 6px; }
